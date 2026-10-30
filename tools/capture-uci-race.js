@@ -161,27 +161,38 @@ import {
       document.body.appendChild(box);
       return;
     }
-    var next = opts.next ? nextPageToOpen(c, opts.todo, loadSkips()) : undefined;
+    // the suggested next page: always a button to open it, and with opts.next a countdown that opens it by itself
+    var next = opts.next || opts.todo ? nextPageToOpen(c, opts.todo, loadSkips()) : undefined;
     if (next) {
       var nextEl = document.createElement("div");
       nextEl.style.cssText = "margin-top:8px;font-weight:bold;color:#c2410c";
       box.appendChild(nextEl);
-      var left = COUNTDOWN;
-      var show = function () {
-        nextEl.textContent = "Opening the next missing page in " + left + " s: " + next.label;
-      };
-      show();
-      timer = setInterval(function () {
-        left--;
-        if (left > 0) return show();
+      var go = function () {
         cancelCountdown();
         nextEl.textContent = "Opening " + next.label + " ...";
         location.href = next.path;
-      }, 1000);
-      btn("Stay here", function () {
-        cancelCountdown();
-        nextEl.textContent = "Staying on this page.";
-      });
+      };
+      var still = function () {
+        nextEl.textContent = "Next missing page: " + next.label;
+      };
+      btn("Open the next page", go);
+      if (opts.next) {
+        var left = COUNTDOWN;
+        var show = function () {
+          nextEl.textContent = "Opening the next missing page in " + left + " s: " + next.label;
+        };
+        show();
+        timer = setInterval(function () {
+          left--;
+          if (left > 0) show();
+          else go();
+        }, 1000);
+        var stay = btn("Stay here", function () {
+          cancelCountdown();
+          still();
+          stay.remove();
+        });
+      } else still();
     } else if (opts.next) {
       var doneEl = document.createElement("div");
       doneEl.style.cssText = "margin-top:8px;font-weight:bold";
@@ -202,7 +213,6 @@ import {
       });
     }
     btn("Download collection", function () {
-      cancelCountdown();
       var blob = new Blob([JSON.stringify(load(), null, 1)], { type: "application/json" });
       var a = document.createElement("a");
       a.href = URL.createObjectURL(blob);
