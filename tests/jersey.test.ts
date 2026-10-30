@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { eventPagePath, jerseyKind, missingJerseyEvents } from "../src/core";
+import { competitionPagePath, eventPagePath, jerseyKind, missingJerseyEvents, nextPageToOpen } from "../src/core";
 
 describe("the jersey pages that pay points", () => {
   it("tells the leader pages and the final points and mountain pages from everything else", () => {
@@ -37,5 +37,49 @@ describe("the jersey pages that pay points", () => {
 
   it("builds the address the competition page itself links to", () => {
     expect(eventPagePath(76406, 366957)).toBe("/iframe/EventResults/366957?competitionId=76406&disciplineId=10");
+  });
+});
+
+describe("the next page to open after a capture", () => {
+  const comp = (id: number, name: string, inProgress = false) => ({ id, name, start: "2026-10-01", end: "2026-10-01", year: 2026, country: "ITA", class: "1.Pro", inProgress });
+  const stageRace = {
+    competitionId: 2,
+    events: [
+      { id: 21, name: "Stage 1: Stage Classification" },
+      { id: 22, name: "Stage 1: Stage General Classification" },
+      { id: 23, name: "Final Classification: General Classification" },
+      { id: 24, name: "Final Classification: Youth Classification" },
+    ],
+  };
+  const collection = {
+    competitions: [comp(1, "Giro del Veneto"), comp(2, "Tour of Guangxi"), comp(3, "Veneto Women", true), comp(4, "Paris-Tours")],
+    competitionEvents: [stageRace],
+    eventResults: [] as { competitionId: number; eventId: number }[],
+  };
+
+  it("stays in the race it came from first: results, then leader, then final pages", () => {
+    expect(nextPageToOpen(collection, 2)).toEqual({ path: eventPagePath(2, 23), label: "Tour of Guangxi: Final Classification: General Classification" });
+    expect(nextPageToOpen({ ...collection, eventResults: [{ competitionId: 2, eventId: 23 }] }, 2)?.path).toBe(eventPagePath(2, 21));
+    const done = { ...collection, eventResults: [21, 23].map((eventId) => ({ competitionId: 2, eventId })) };
+    expect(nextPageToOpen(done, 2)?.path).toBe(eventPagePath(2, 22));
+  });
+
+  it("then goes to the next race in list order, opening its competition page when its events are not known yet", () => {
+    const done = { ...collection, eventResults: [21, 22, 23].map((eventId) => ({ competitionId: 2, eventId })) };
+    expect(nextPageToOpen(done, 2)).toEqual({ path: competitionPagePath(1), label: "Giro del Veneto" });
+  });
+
+  it("leaves out races still in progress and anything skipped", () => {
+    const done = { ...collection, eventResults: [21, 22, 23].map((eventId) => ({ competitionId: 2, eventId })) };
+    expect(nextPageToOpen(done, 2, { competitions: [1], events: [] })?.path).toBe(competitionPagePath(4));
+    expect(nextPageToOpen(collection, 2, { competitions: [], events: [21] })?.path).toBe(eventPagePath(2, 23));
+  });
+
+  it("says nothing is left when every known page is captured or skipped", () => {
+    expect(nextPageToOpen(collection, 2, { competitions: [1, 2, 4], events: [] })).toBeUndefined();
+  });
+
+  it("builds the address the competition list itself links to", () => {
+    expect(competitionPagePath(77536)).toBe("/iframe/CompetitionResults/77536?disciplineId=10");
   });
 });

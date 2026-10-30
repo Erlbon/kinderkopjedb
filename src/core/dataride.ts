@@ -247,6 +247,54 @@ export function eventPagePath(competitionId: number, eventId: number): string {
   return "/iframe/EventResults/" + eventId + "?competitionId=" + competitionId + "&disciplineId=10";
 }
 
+/** The address of a competition page, as the competition list links to it. */
+export function competitionPagePath(competitionId: number): string {
+  return "/iframe/CompetitionResults/" + competitionId + "?disciplineId=10";
+}
+
+/** True when a saved event list holds the opened rows (stages, final classifications), not just the closed page. */
+export function hasEventList(ce: DrCompetitionEvents | undefined): boolean {
+  return !!ce && ce.events.some((e) => /^(Stage|Prologue|Final)/i.test(e.name));
+}
+
+export interface CaptureSkips {
+  competitions: number[];
+  events: number[];
+}
+
+/** One competition's pages still to open, in the order to open them: results, leader pages, final jersey pages. */
+export function missingEventsInOrder(c: { competitionEvents: DrCompetitionEvents[]; eventResults: { competitionId: number; eventId: number }[] }, competitionId: number, skipEvents: Iterable<number> = []): DrEvent[] {
+  const ce = c.competitionEvents.find((x) => x.competitionId === competitionId);
+  if (!ce) return [];
+  const have = c.eventResults.filter((r) => r.competitionId === competitionId).map((r) => r.eventId);
+  const m = missingJerseyEvents(ce.events, [...have, ...skipEvents]);
+  return [...m.results, ...m.leader, ...m.final];
+}
+
+/**
+ * The next page to open after a capture: the missing pages of the race it came from first, then each race of the list in
+ * order (its competition page when its events are not known yet, else its first missing page). Races still in progress
+ * and anything skipped are left out. Undefined when nothing is left.
+ */
+export function nextPageToOpen(
+  c: { competitions: DrCompetition[]; competitionEvents: DrCompetitionEvents[]; eventResults: { competitionId: number; eventId: number }[] },
+  from?: number,
+  skip: CaptureSkips = { competitions: [], events: [] },
+): { path: string; label: string } | undefined {
+  const names = new Map(c.competitions.map((x) => [x.id, x.name]));
+  const order = [...(from !== undefined ? [from] : []), ...c.competitions.filter((x) => !x.inProgress).map((x) => x.id), ...c.competitionEvents.map((x) => x.competitionId)];
+  const seen = new Set<number>();
+  for (const id of order) {
+    if (seen.has(id) || skip.competitions.includes(id)) continue;
+    seen.add(id);
+    const name = names.get(id) ?? "Competition " + id;
+    if (!hasEventList(c.competitionEvents.find((x) => x.competitionId === id))) return { path: competitionPagePath(id), label: name };
+    const next = missingEventsInOrder(c, id, skip.events)[0];
+    if (next) return { path: eventPagePath(id, next.id), label: name + ": " + next.name };
+  }
+  return undefined;
+}
+
 /** Rows in one page of a DataRide table. */
 export const PAGE_SIZE = 40;
 

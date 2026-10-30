@@ -10,21 +10,42 @@
  *   - on the list, the "next page" button, until the last page
  *   - on a competition page, the triangle of each closed row (stages, final classification), then the next page
  *   - on an event page, the "next page" button while every row on the page scored points
- * It never leaves the page you pressed it on, never follows a link, and sends no requests of its own: the page loads
- * its data itself when clicked. The Stop button ends it at once. Then download the collection and open it in KinderkopjeDB.
+ * After a competition or a complete event it opens the next missing page by itself after a short countdown (this race's
+ * missing pages first, then the next race of the list), so you only press the bookmark once per page; "Stay here" stops it.
+ * "Get everything for this race" reads all of the race's missing pages in a hidden frame on this page, one page at a time
+ * with a pause, as if you opened each one. Nothing here calls DataRide's data service itself: each page loads its own
+ * data as it does for you. The Stop button ends it at once. Then download the collection and open it in KinderkopjeDB.
  *
  * Reading the pages is done by src/core/dataride.ts and the clicking by src/core/autopilot.ts, the code the tests cover;
  * the build bundles them here.
  */
-import { expandAll, pageThrough, realEnv } from "../src/core/autopilot";
-import { eventPagePath, isComplete, isOtherCategory, mergeEvents, missingJerseyEvents, pageKind, readCompetitionEvents, readCompetitionList, readEventResults } from "../src/core/dataride";
+import { expandAll, pageThrough, realEnv, waitFor } from "../src/core/autopilot";
+import {
+  competitionPagePath,
+  eventPagePath,
+  hasEventList,
+  isComplete,
+  isOtherCategory,
+  mergeEvents,
+  missingEventsInOrder,
+  missingJerseyEvents,
+  nextPageToOpen,
+  pageKind,
+  readCompetitionEvents,
+  readCompetitionList,
+  readEventResults,
+} from "../src/core/dataride";
 
 (function () {
   // The names below keep the tool's earlier name: collections already saved in your browser, and
   // files already downloaded, must keep working.
   var STORE = "racethreads-capture-uci";
+  var SKIP_STORE = "racethreads-capture-uci-skip";
   var FORMAT = "racethreads-capture/1";
+  var COUNTDOWN = 5; // seconds before the next page opens by itself
+  var FRAME_PAUSE = 1500; // ms between two pages read in the hidden frame
   var stopped = false;
+  var timer = null;
 
   function load() {
     var v = null;
@@ -40,6 +61,19 @@ import { eventPagePath, isComplete, isOtherCategory, mergeEvents, missingJerseyE
   function save(c) {
     localStorage.setItem(STORE, JSON.stringify(c));
   }
+  // pages and races you chose to skip; kept apart from the collection so the capture file stays as it was
+  function loadSkips() {
+    var v = null;
+    try {
+      v = JSON.parse(localStorage.getItem(SKIP_STORE) || "null");
+    } catch (e) {}
+    return { competitions: (v && v.competitions) || [], events: (v && v.events) || [] };
+  }
+  function skip(kind, id) {
+    var s = loadSkips();
+    if (s[kind].indexOf(id) < 0) s[kind].push(id);
+    localStorage.setItem(SKIP_STORE, JSON.stringify(s));
+  }
 
   var msgEl = null;
   var infoEl = null;
@@ -47,15 +81,15 @@ import { eventPagePath, isComplete, isOtherCategory, mergeEvents, missingJerseyE
     return "Collection: " + c.competitions.length + " competitions, " + c.competitionEvents.length + " event lists, " + c.eventResults.length + " event results";
   }
 
-  // the jersey pages of one competition that are known (from its saved event list) but not captured yet
+  // the pages of one competition that are known (from its saved event list) but not captured yet
   function missingFor(c, competitionId) {
     var events = [];
     for (var i = 0; i < c.competitionEvents.length; i++) if (c.competitionEvents[i].competitionId === competitionId) events = c.competitionEvents[i].events;
     var have = c.eventResults.filter(function (r) { return r.competitionId === competitionId; }).map(function (r) { return r.eventId; });
-    return missingJerseyEvents(events, have);
+    return missingJerseyEvents(events, have.concat(loadSkips().events));
   }
 
-  // links to the missing pages: you click one (the bookmark never opens a page for you), then press the bookmark there
+  // links to the missing pages, for when you want to pick one yourself
   function todoList(box, c, competitionId) {
     var m = missingFor(c, competitionId);
     var line = document.createElement("div");
@@ -84,8 +118,18 @@ import { eventPagePath, isComplete, isOtherCategory, mergeEvents, missingJerseyE
     group("End of the race (not every race pays these):", m.final);
   }
 
-  // running = true shows a Stop button while the bookmark is clicking; opts.todo = a competition id to list the missing jersey pages for
+  function cancelCountdown() {
+    if (timer) clearInterval(timer);
+    timer = null;
+  }
+
+  // running = true shows a Stop button while the bookmark is clicking
+  // opts.todo = a competition id to list the missing pages for (and offer "Get everything" for)
+  // opts.reread = offer "Open the rows again"; opts.skip = { kind, id, label } offers a skip button
+  // opts.next = true counts down to the next missing page and opens it
   function overlay(msg, c, running, opts) {
+    cancelCountdown();
+    opts = opts || {};
     var old = document.getElementById("kinderkopjedb-overlay");
     if (old) old.remove();
     var box = document.createElement("div");
@@ -100,44 +144,90 @@ import { eventPagePath, isComplete, isOtherCategory, mergeEvents, missingJerseyE
     infoEl.style.cssText = "margin-top:4px;color:#555";
     infoEl.textContent = counts(c);
     box.appendChild(infoEl);
-    if (opts && opts.todo) todoList(box, c, opts.todo);
+    if (opts.todo) todoList(box, c, opts.todo);
     function btn(label, fn) {
       var b = document.createElement("button");
       b.textContent = label;
       b.style.cssText = "margin:6px 6px 0 0;padding:4px 8px;cursor:pointer";
       b.onclick = fn;
       box.appendChild(b);
+      return b;
     }
     if (running) {
       btn("Stop", function () {
         stopped = true;
-        msgEl.textContent = "Stopping after the current click ...";
+        msgEl.textContent = "Stopping after the current page ...";
       });
-    } else {
-      btn("Download collection", function () {
-        var blob = new Blob([JSON.stringify(load(), null, 1)], { type: "application/json" });
-        var a = document.createElement("a");
-        a.href = URL.createObjectURL(blob);
-        a.download = "uci-capture.json";
-        document.body.appendChild(a);
-        a.click();
-        a.remove();
+      document.body.appendChild(box);
+      return;
+    }
+    var next = opts.next ? nextPageToOpen(c, opts.todo, loadSkips()) : undefined;
+    if (next) {
+      var nextEl = document.createElement("div");
+      nextEl.style.cssText = "margin-top:8px;font-weight:bold;color:#c2410c";
+      box.appendChild(nextEl);
+      var left = COUNTDOWN;
+      var show = function () {
+        nextEl.textContent = "Opening the next missing page in " + left + " s: " + next.label;
+      };
+      show();
+      timer = setInterval(function () {
+        left--;
+        if (left > 0) return show();
+        cancelCountdown();
+        nextEl.textContent = "Opening " + next.label + " ...";
+        location.href = next.path;
+      }, 1000);
+      btn("Stay here", function () {
+        cancelCountdown();
+        nextEl.textContent = "Staying on this page.";
       });
-      btn("Clear collection", function () {
-        if (confirm("Delete everything captured so far?")) {
-          localStorage.removeItem(STORE);
-          overlay("Collection cleared.", load(), false);
-        }
-      });
-      if (opts && opts.reread) {
-        btn("Open the rows again", function () {
-          run(true);
-        });
-      }
-      btn("Close", function () {
-        box.remove();
+    } else if (opts.next) {
+      var doneEl = document.createElement("div");
+      doneEl.style.cssText = "margin-top:8px;font-weight:bold";
+      doneEl.textContent = "Nothing is left to open: every race in the collection is captured or skipped.";
+      box.appendChild(doneEl);
+    }
+    if (opts.todo && missingEventsInOrder(c, opts.todo, loadSkips().events).length) {
+      btn("Get everything for this race", function () {
+        everything(opts.todo);
       });
     }
+    if (opts.skip) {
+      btn("Skip this " + opts.skip.label + " and go on", function () {
+        skip(opts.skip.kind, opts.skip.id);
+        var n = nextPageToOpen(load(), opts.todo, loadSkips());
+        if (n) location.href = n.path;
+        else overlay("Skipped. Nothing else is left to open.", load(), false);
+      });
+    }
+    btn("Download collection", function () {
+      cancelCountdown();
+      var blob = new Blob([JSON.stringify(load(), null, 1)], { type: "application/json" });
+      var a = document.createElement("a");
+      a.href = URL.createObjectURL(blob);
+      a.download = "uci-capture.json";
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+    });
+    btn("Clear collection", function () {
+      cancelCountdown();
+      if (confirm("Delete everything captured so far?")) {
+        localStorage.removeItem(STORE);
+        localStorage.removeItem(SKIP_STORE);
+        overlay("Collection cleared.", load(), false);
+      }
+    });
+    if (opts.reread) {
+      btn("Open the rows again", function () {
+        run(true);
+      });
+    }
+    btn("Close", function () {
+      cancelCountdown();
+      box.remove();
+    });
     document.body.appendChild(box);
   }
   function progress(text, c) {
@@ -186,9 +276,145 @@ import { eventPagePath, isComplete, isOtherCategory, mergeEvents, missingJerseyE
     return stopped;
   };
 
+  // open every closed row of a competition page (this one or one in the hidden frame) and save its event list
+  async function readCompetitionIn(doc, pathname, c, say) {
+    var known = null;
+    var opened = 0;
+    await pageThrough(doc, realEnv, {
+      maxPages: 8,
+      pause: 1200,
+      stop: stop,
+      again: function () {
+        return true;
+      },
+      progress: say,
+      read: async function () {
+        opened += await expandAll(doc, realEnv, { stop: stop, progress: say });
+        var ce = readCompetitionEvents(doc, pathname);
+        if (ce && ce.events.length) {
+          for (var j = 0; j < c.competitionEvents.length; j++) if (c.competitionEvents[j].competitionId === ce.competitionId) known = c.competitionEvents[j];
+          if (known) known.events = mergeEvents(known.events, ce.events);
+          else {
+            c.competitionEvents.push(ce);
+            known = ce;
+          }
+          save(c);
+        }
+        return ce;
+      },
+    });
+    return { known: known, opened: opened };
+  }
+
+  // read an event page's points (this one or one in the hidden frame), going on to the next page of the table while it scores
+  async function readEventIn(doc, pathname, search, c, say) {
+    var last = null;
+    var pages = await pageThrough(doc, realEnv, {
+      maxPages: 4,
+      pause: 1200,
+      stop: stop,
+      again: function (ev) {
+        // the next page can hold more points only when every row on this page scored
+        return !!ev && ev.rows.length === ev.totalRows;
+      },
+      progress: say,
+      read: function () {
+        var ev = readEventResults(doc, pathname, search);
+        if (ev && ev.totalRows) {
+          addEventResult(c, ev);
+          save(c);
+          last = ev;
+          say("Read " + ev.rows.length + " point-scoring rows of " + ev.totalRows + " ...");
+        }
+        return ev;
+      },
+    });
+    var all = null;
+    if (last) for (var k = 0; k < c.eventResults.length; k++) if (c.eventResults[k].eventId === last.eventId) all = c.eventResults[k];
+    return { last: last, all: all, pages: pages };
+  }
+
+  // load one DataRide page of this site in a hidden frame and hand its document to `use` once `ready` says it has loaded
+  function inFrame(path, ready, use) {
+    return new Promise(function (resolve) {
+      var f = document.createElement("iframe");
+      f.style.cssText = "position:fixed;left:-3000px;top:0;width:1200px;height:900px;visibility:hidden";
+      f.onload = async function () {
+        var out = null;
+        try {
+          var doc = f.contentDocument;
+          var ok = await waitFor(function () {
+            return ready(doc, f.contentWindow.location);
+          }, realEnv, 20000, 300);
+          if (ok) out = await use(doc, f.contentWindow.location);
+        } catch (e) {}
+        f.remove();
+        resolve(out);
+      };
+      f.src = path;
+      document.body.appendChild(f);
+    });
+  }
+
+  // read every missing page of one race in the hidden frame: its event list first when it is not known yet
+  async function everything(competitionId) {
+    stopped = false;
+    var c = load();
+    var say = function (t) {
+      progress(t, c);
+    };
+    overlay("Getting everything for this race ...", c, true);
+    var ce = null;
+    for (var i = 0; i < c.competitionEvents.length; i++) if (c.competitionEvents[i].competitionId === competitionId) ce = c.competitionEvents[i];
+    if (!hasEventList(ce)) {
+      say("Opening the race's competition page ...");
+      await inFrame(
+        competitionPagePath(competitionId),
+        function (doc, loc) {
+          var x = readCompetitionEvents(doc, loc.pathname);
+          return !!x && x.events.length > 0;
+        },
+        function (doc, loc) {
+          return readCompetitionIn(doc, loc.pathname, c, say);
+        },
+      );
+    }
+    var todo = missingEventsInOrder(c, competitionId, loadSkips().events);
+    var got = 0;
+    var failed = [];
+    for (var n = 0; n < todo.length && !stopped; n++) {
+      var e = todo[n];
+      say("Page " + (n + 1) + " of " + todo.length + ": " + e.name + " ...");
+      var r = await inFrame(
+        eventPagePath(competitionId, e.id),
+        function (doc, loc) {
+          var ev = readEventResults(doc, loc.pathname, loc.search);
+          return !!ev && ev.totalRows > 0;
+        },
+        function (doc, loc) {
+          return readEventIn(doc, loc.pathname, loc.search, c, function () {});
+        },
+      );
+      if (r && r.last) got++;
+      else failed.push(e.name);
+      if (n + 1 < todo.length && !stopped) await realEnv.sleep(FRAME_PAUSE);
+    }
+    overlay(
+      (stopped ? "Stopped. " : "Done. ") + "Read " + got + " of " + todo.length + " missing pages of this race." +
+        (failed.length ? " These did not load and are still missing: " + failed.join(", ") + "." : ""),
+      c,
+      false,
+      { todo: competitionId, next: !stopped && !failed.length },
+    );
+  }
+
   async function run(force) {
+    stopped = false;
     var c = load();
     var kind = pageKind(location.pathname);
+    var say = function (t) {
+      progress(t, c);
+    };
 
     if (kind === "list") {
       var filter = categoryFilterText();
@@ -225,110 +451,61 @@ import { eventPagePath, isComplete, isOtherCategory, mergeEvents, missingJerseyE
       overlay(
         (stopped ? "Stopped. " : "Done. ") + "Read " + pages + " page" + (pages === 1 ? "" : "s") + " of the list, " + listed + " competitions" +
           (filter ? " (" + filter + ")" : " (no Category filter found: women's races are told by their names)") +
-          ". NEXT: download the collection and open it in KinderkopjeDB, or change the season or category and press again.",
+          ". NEXT: download the collection and open it in KinderkopjeDB, change the season or category and press again, or go through the races one by one below.",
         c,
         false,
+        { next: !stopped },
       );
       return;
     }
 
     if (kind === "competition") {
       // a competition whose rows were opened in an earlier press is not opened again: its event list is already saved,
-      // so nothing is clicked and the missing jersey pages are listed straight away
+      // so nothing is clicked and the missing pages are listed straight away
       var compId = Number(/CompetitionResults\/(\d+)/i.exec(location.pathname)[1]);
       var saved = null;
       for (var s = 0; s < c.competitionEvents.length; s++) if (c.competitionEvents[s].competitionId === compId) saved = c.competitionEvents[s];
-      if (!force && saved && saved.events.some(function (e) { return /^(Stage|Prologue|Final)/i.test(e.name); })) {
-        overlay("This race's event list is already saved, so no rows were opened.", c, false, { todo: compId, reread: true });
+      if (!force && hasEventList(saved)) {
+        overlay("This race's event list is already saved, so no rows were opened.", c, false, { todo: compId, reread: true, next: true, skip: { kind: "competitions", id: compId, label: "race" } });
         return;
       }
       overlay("Opening the closed rows of this competition ...", c, true);
-      var known = null;
-      var opened = 0;
-      await pageThrough(document, realEnv, {
-        maxPages: 8,
-        pause: 1200,
-        stop: stop,
-        again: function () {
-          return true;
-        },
-        progress: function (t) {
-          progress(t, c);
-        },
-        read: async function () {
-          opened += await expandAll(document, realEnv, {
-            stop: stop,
-            progress: function (t) {
-              progress(t, c);
-            },
-          });
-          var ce = readCompetitionEvents(document, location.pathname);
-          if (ce && ce.events.length) {
-            for (var j = 0; j < c.competitionEvents.length; j++) if (c.competitionEvents[j].competitionId === ce.competitionId) known = c.competitionEvents[j];
-            if (known) known.events = mergeEvents(known.events, ce.events);
-            else {
-              c.competitionEvents.push(ce);
-              known = ce;
-            }
-            save(c);
-          }
-          return ce;
-        },
-      });
-      if (!known) {
-        overlay("No events found on this page. Wait for it to load, then press again.", c, false);
+      var got = await readCompetitionIn(document, location.pathname, c, say);
+      if (!got.known) {
+        overlay("No events found on this page. Wait for it to load, then press again, or skip the race.", c, false, { skip: { kind: "competitions", id: compId, label: "race" } });
         return;
       }
       overlay(
-        (stopped ? "Stopped. " : "Done. ") + "Opened " + opened + " row" + (opened === 1 ? "" : "s") + "; " + known.events.length + " events known for this competition. " +
-          "NEXT: open the General Classification and the stage results and press again on each; the jersey pages still missing are listed below.",
+        (stopped ? "Stopped. " : "Done. ") + "Opened " + got.opened + " row" + (got.opened === 1 ? "" : "s") + "; " + got.known.events.length + " events known for this competition. " +
+          "NEXT: the missing pages open one by one (press the bookmark on each), or get them all at once.",
         c,
         false,
-        { todo: compId },
+        { todo: compId, next: !stopped, skip: { kind: "competitions", id: compId, label: "race" } },
       );
       return;
     }
 
     if (kind === "event") {
+      var here = Number(/EventResults\/(\d+)/i.exec(location.pathname)[1]);
+      var fromComp = Number(/competitionId=(\d+)/i.exec(location.search)?.[1]) || undefined;
       overlay("Reading the results ...", c, true);
-      var last = null;
-      var read = await pageThrough(document, realEnv, {
-        maxPages: 4,
-        pause: 1200,
-        stop: stop,
-        again: function (ev) {
-          // the next page can hold more points only when every row on this page scored
-          return !!ev && ev.rows.length === ev.totalRows;
-        },
-        progress: function (t) {
-          progress(t, c);
-        },
-        read: function () {
-          var ev = readEventResults(document, location.pathname, location.search);
-          if (ev && ev.totalRows) {
-            addEventResult(c, ev);
-            save(c);
-            last = ev;
-            progress("Read " + ev.rows.length + " point-scoring rows of " + ev.totalRows + " ...", c);
-          }
-          return ev;
-        },
-      });
-      if (!last) {
-        overlay("No result table found, or it is empty so far. Wait for the results to load, then press again.", c, false);
+      var ev = await readEventIn(document, location.pathname, location.search, c, say);
+      if (!ev.last) {
+        overlay("No result table found, or it is empty so far. Wait for the results to load, then press again, or skip the page.", c, false, {
+          todo: fromComp,
+          skip: { kind: "events", id: here, label: "page" },
+        });
         return;
       }
-      var all = null;
-      for (var k = 0; k < c.eventResults.length; k++) if (c.eventResults[k].eventId === last.eventId) all = c.eventResults[k];
-      var complete = all && isComplete(all);
+      var complete = ev.all && isComplete(ev.all);
       overlay(
-        (stopped ? "Stopped. " : "") + "Captured " + (all ? all.rows.length : 0) + " point-scoring rows from " + read + " page" + (read === 1 ? "" : "s") + ". " +
+        (stopped ? "Stopped. " : "") + "Captured " + (ev.all ? ev.all.rows.length : 0) + " point-scoring rows from " + ev.pages + " page" + (ev.pages === 1 ? "" : "s") + ". " +
           (complete
-            ? "This event is complete. NEXT: pick the next missing page below, or go back to the competition page, or download the collection."
+            ? "This event is complete."
             : "The last page I read still had only scoring rows; press again to go on, or the points may end exactly there."),
         c,
         false,
-        { todo: last.competitionId },
+        { todo: ev.last.competitionId, next: complete && !stopped },
       );
       return;
     }
