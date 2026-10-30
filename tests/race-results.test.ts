@@ -47,7 +47,7 @@ describe("race results from a capture file", () => {
   });
   it("a file with both team rankings and race results is understood, and a foreign file is refused", () => {
     expect(addCapture(emptyCube(), { format: "racethreads-capture/1", snapshots: [], raceResults: [parisTours] }).races).toBe(1);
-    expect(addCapture(emptyCube(), {} as CaptureFile).skipped[0]).toContain("not a Kinderkopje capture file");
+    expect(addCapture(emptyCube(), {} as CaptureFile).skipped[0]).toContain("not a KinderkopjeDB capture file");
   });
 });
 

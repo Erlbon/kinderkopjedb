@@ -117,7 +117,7 @@ export function initData(store: Store): void {
     drawDictionary();
   }
 
-  $("dbexport").onclick = () => download("kinderkopje.sqlite", store.exportBytes(), "application/vnd.sqlite3");
+  $("dbexport").onclick = () => download("kinderkopjedb.sqlite", store.exportBytes(), "application/vnd.sqlite3");
   $<HTMLInputElement>("dbimport").onchange = async (e) => {
     const f = (e.target as HTMLInputElement).files?.[0];
     if (!f) return;
@@ -156,15 +156,15 @@ export function initData(store: Store): void {
   $("pubsave").onclick = async () => {
     const SQL = await initSqlJs();
     const bytes = makePublicCopy(SQL, store.db, "Made from the collector's own database, with its joins, names and links.");
-    download("kinderkopje-public.sqlite", bytes, "application/vnd.sqlite3");
+    download("kinderkopjedb-public.sqlite", bytes, "application/vnd.sqlite3");
     $("pubmsg").textContent =
-      "Saved: " + describe(publicInfo(openDatabase(SQL, bytes))) + " Put the file at data/public/kinderkopje-public.sqlite in the project and publish; saved texts, the queue and contributor names are not in it.";
+      "Saved: " + describe(publicInfo(openDatabase(SQL, bytes))) + " Put the file at data/public/kinderkopjedb-public.sqlite in the project and publish; saved texts, the queue and contributor names are not in it.";
   };
   // is a beta file published on this site?
   void (async () => {
     const status = $("pubstatus");
     try {
-      const res = await fetch("kinderkopje-public.sqlite", { method: "HEAD" });
+      const res = await fetch("kinderkopjedb-public.sqlite", { method: "HEAD" });
       if (!res.ok) throw new Error("none");
       const size = Number(res.headers.get("content-length") ?? 0);
       status.textContent = "A beta file is published" + (size ? " (" + (size / 1048576).toFixed(1) + " MB)" : "") + ". Press Search it here to see what it holds.";
@@ -177,7 +177,7 @@ export function initData(store: Store): void {
     const msg = $("pubmsg");
     msg.textContent = "Loading the beta database ...";
     try {
-      const res = await fetch("kinderkopje-public.sqlite");
+      const res = await fetch("kinderkopjedb-public.sqlite");
       if (!res.ok) throw new Error(res.status === 404 ? "no beta file has been published on this site yet" : "HTTP " + res.status);
       const SQL = await initSqlJs();
       publicDb = openDatabase(SQL, new Uint8Array(await res.arrayBuffer()));
@@ -196,7 +196,7 @@ export function initData(store: Store): void {
     const msg = $("pubmsg");
     msg.textContent = "Loading the public dataset ...";
     try {
-      const res = await fetch("kinderkopje-public.sqlite");
+      const res = await fetch("kinderkopjedb-public.sqlite");
       if (!res.ok) throw new Error(res.status === 404 ? "no public dataset has been published on this site yet" : "HTTP " + res.status);
       const SQL = await initSqlJs();
       publicDb = openDatabase(SQL, new Uint8Array(await res.arrayBuffer()));

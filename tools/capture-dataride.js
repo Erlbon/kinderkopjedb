@@ -1,11 +1,11 @@
 /*
- * Kinderkopje: capture helper for UCI DataRide ranking pages (runs as a bookmarklet in YOUR browser).
+ * KinderkopjeDB: capture helper for UCI DataRide ranking pages (runs as a bookmarklet in YOUR browser).
  *
  * What it does: when you press it on a DataRide ranking page, it copies the rows that are already
  * shown on screen (rank, name, nation, points ...) into a collection kept in your browser. It sends
  * no requests of its own. You choose the season and date with the page's own dropdowns and click
  * through the pages yourself; press it on each page you want. Then download the collection as one
- * file and open it in Kinderkopje.
+ * file and open it in KinderkopjeDB.
  *
  * Output format "racethreads-capture/1": a list of snapshots, each with the page's context
  * (ranking, season, date, snapshot id) and its rows.
@@ -48,10 +48,10 @@
   }
 
   function overlay(msg, collection) {
-    var old = document.getElementById("kinderkopje-overlay");
+    var old = document.getElementById("kinderkopjedb-overlay");
     if (old) old.remove();
     var box = document.createElement("div");
-    box.id = "kinderkopje-overlay";
+    box.id = "kinderkopjedb-overlay";
     box.style.cssText =
       "position:fixed;right:12px;bottom:12px;z-index:99999;background:#fff;color:#111;border:2px solid #ff6a2b;" +
       "border-radius:8px;padding:10px 12px;font:13px system-ui,sans-serif;max-width:340px;box-shadow:0 2px 10px rgba(0,0,0,.3)";

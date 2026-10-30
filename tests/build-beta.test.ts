@@ -7,7 +7,7 @@ import initSqlJs from "sql.js/dist/sql-wasm-inline.js";
 import { openDatabase, publicInfo } from "../src/db";
 
 // the script that builds the public beta file, run for real on a small capture
-const dir = mkdtempSync(join(tmpdir(), "kinderkopje-beta-"));
+const dir = mkdtempSync(join(tmpdir(), "kinderkopjedb-beta-"));
 afterAll(() => rmSync(dir, { recursive: true, force: true }));
 
 const comp = (id: number, name: string, year: number) => ({ id, name, start: year + "-03-20", end: year + "-03-20", year, country: "ITA", class: "1.UWT", inProgress: false, category: "ME" });

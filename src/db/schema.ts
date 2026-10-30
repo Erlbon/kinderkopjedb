@@ -1,7 +1,7 @@
 import type { Database } from "sql.js";
 
 /**
- * The Kinderkopje database (SQLite). One file holds everything the pages share:
+ * The KinderkopjeDB database (SQLite). One file holds everything the pages share:
  * team ranking snapshots, race results, the capture queue, team levels and the settings texts.
  * Bump SCHEMA_VERSION and add a step to MIGRATIONS when a table changes.
  */
@@ -186,7 +186,7 @@ export function migrate(db: Database): void {
   const have = schemaVersion(db);
   if (have > SCHEMA_VERSION) {
     throw new Error(
-      "This database was made by a newer version of Kinderkopje (schema " + have + ", this one knows " + SCHEMA_VERSION + "). This page is running an older copy of the tool, usually a page your browser kept from before an update: reload it with Ctrl+F5 (and close other tabs of this site that are still open). Your data has not been changed.",
+      "This database was made by a newer version of KinderkopjeDB (schema " + have + ", this one knows " + SCHEMA_VERSION + "). This page is running an older copy of the tool, usually a page your browser kept from before an update: reload it with Ctrl+F5 (and close other tabs of this site that are still open). Your data has not been changed.",
     );
   }
   for (let v = have + 1; v <= SCHEMA_VERSION; v++) {

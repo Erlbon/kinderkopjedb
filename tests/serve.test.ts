@@ -5,7 +5,7 @@ import { join } from "node:path";
 import { afterAll, describe, expect, it } from "vitest";
 
 // the offline server, started for real in a temporary folder
-const dir = mkdtempSync(join(tmpdir(), "kinderkopje-serve-"));
+const dir = mkdtempSync(join(tmpdir(), "kinderkopjedb-serve-"));
 copyFileSync(new URL("../tools/serve.mjs", import.meta.url), join(dir, "serve.mjs"));
 writeFileSync(join(dir, "index.html"), "<p>hi</p>");
 writeFileSync(join(dir, "favicon.svg"), '<svg xmlns="http://www.w3.org/2000/svg"/>');

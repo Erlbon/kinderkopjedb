@@ -1,5 +1,5 @@
 /*
- * Kinderkopje: capture helper for UCI DataRide road results (runs as a bookmarklet in YOUR browser).
+ * KinderkopjeDB: capture helper for UCI DataRide road results (runs as a bookmarklet in YOUR browser).
  *
  * Press it on one of three DataRide pages that you have opened yourself:
  *   1. the list of competitions  (dataride.uci.ch/iframe/Results/10/, pick the season and category with the page's own filters)
@@ -11,7 +11,7 @@
  *   - on a competition page, the triangle of each closed row (stages, final classification), then the next page
  *   - on an event page, the "next page" button while every row on the page scored points
  * It never leaves the page you pressed it on, never follows a link, and sends no requests of its own: the page loads
- * its data itself when clicked. The Stop button ends it at once. Then download the collection and open it in Kinderkopje.
+ * its data itself when clicked. The Stop button ends it at once. Then download the collection and open it in KinderkopjeDB.
  *
  * Reading the pages is done by src/core/dataride.ts and the clicking by src/core/autopilot.ts, the code the tests cover;
  * the build bundles them here.
@@ -86,10 +86,10 @@ import { eventPagePath, isComplete, isOtherCategory, mergeEvents, missingJerseyE
 
   // running = true shows a Stop button while the bookmark is clicking; opts.todo = a competition id to list the missing jersey pages for
   function overlay(msg, c, running, opts) {
-    var old = document.getElementById("kinderkopje-overlay");
+    var old = document.getElementById("kinderkopjedb-overlay");
     if (old) old.remove();
     var box = document.createElement("div");
-    box.id = "kinderkopje-overlay";
+    box.id = "kinderkopjedb-overlay";
     box.style.cssText =
       "position:fixed;right:12px;bottom:12px;z-index:99999;background:#fff;color:#111;border:2px solid #ff6a2b;" +
       "border-radius:8px;padding:10px 12px;font:13px system-ui,sans-serif;max-width:400px;box-shadow:0 2px 10px rgba(0,0,0,.3)";
@@ -225,7 +225,7 @@ import { eventPagePath, isComplete, isOtherCategory, mergeEvents, missingJerseyE
       overlay(
         (stopped ? "Stopped. " : "Done. ") + "Read " + pages + " page" + (pages === 1 ? "" : "s") + " of the list, " + listed + " competitions" +
           (filter ? " (" + filter + ")" : " (no Category filter found: women's races are told by their names)") +
-          ". NEXT: download the collection and open it in Kinderkopje, or change the season or category and press again.",
+          ". NEXT: download the collection and open it in KinderkopjeDB, or change the season or category and press again.",
         c,
         false,
       );

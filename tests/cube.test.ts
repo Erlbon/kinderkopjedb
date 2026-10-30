@@ -140,7 +140,7 @@ describe("importing the same date twice", () => {
     expect(cube.teamSnapshots).toHaveLength(2);
   });
   it("refuses files that are not captures, and snapshots without a date", () => {
-    expect(addCapture(emptyCube(), {} as CaptureFile).skipped[0]).toContain("not a Kinderkopje capture file");
+    expect(addCapture(emptyCube(), {} as CaptureFile).skipped[0]).toContain("not a KinderkopjeDB capture file");
     const f = JSON.parse(read("tests/fixtures/dataride-capture-sample.json")) as CaptureFile;
     f.snapshots![0]!.date = "";
     expect(addCapture(emptyCube(), f).skipped[0]).toContain("no date");

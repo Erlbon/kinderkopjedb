@@ -6,7 +6,7 @@
 // The capture files are the ones the bookmark downloads. --aliases, --renames, --links and --registry are text files with
 // the join lines, the rename lines, the stored links (JSON) and the race registry (YAML) saved in your browser, if you
 // want them in the file; without them the races are not joined and have their default names. The result goes to
-// data/public/kinderkopje-public.sqlite, which the site build publishes as kinderkopje-public.sqlite.
+// data/public/kinderkopjedb-public.sqlite, which the site build publishes as kinderkopjedb-public.sqlite.
 import { build } from "esbuild";
 import { mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
@@ -23,7 +23,7 @@ if (!files.length) {
   console.error("Usage: node scripts/build-beta.mjs <capture.json> [more files] [--out file] [--note text] [--aliases f] [--renames f] [--links f] [--registry f]");
   process.exit(2);
 }
-const out = resolve(opt.out ?? "data/public/kinderkopje-public.sqlite");
+const out = resolve(opt.out ?? "data/public/kinderkopjedb-public.sqlite");
 
 // the tool's own code, bundled for node (packages stay external, so the bundle sits inside the project)
 const bundleFile = resolve("scripts/.beta-bundle.mjs");

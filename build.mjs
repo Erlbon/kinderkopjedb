@@ -53,12 +53,12 @@ copyFileSync("src/site/favicon.svg", "dist/favicon.svg");
 // the data overview as downloadable files, written from the same text the Data page shows
 const dict = await build({ entryPoints: ["src/db/dictionary.ts"], bundle: true, format: "esm", platform: "node", write: false, logLevel: "warning" });
 const overview = await import("data:text/javascript;base64," + Buffer.from(dict.outputFiles[0].text).toString("base64"));
-writeFileSync("dist/kinderkopje-data-overview.html", overview.dictionaryHtml(overview.DICTIONARY, version));
-writeFileSync("dist/kinderkopje-data-overview.md", overview.dictionaryMarkdown(overview.DICTIONARY));
-writeFileSync("dist/kinderkopje-data-overview.json", overview.dictionaryJson(overview.DICTIONARY, version));
+writeFileSync("dist/kinderkopjedb-data-overview.html", overview.dictionaryHtml(overview.DICTIONARY, version));
+writeFileSync("dist/kinderkopjedb-data-overview.md", overview.dictionaryMarkdown(overview.DICTIONARY));
+writeFileSync("dist/kinderkopjedb-data-overview.json", overview.dictionaryJson(overview.DICTIONARY, version));
 
 // the public dataset, when one has been saved into the repository (Data page: Save a public copy)
-if (existsSync("data/public/kinderkopje-public.sqlite")) copyFileSync("data/public/kinderkopje-public.sqlite", "dist/kinderkopje-public.sqlite");
+if (existsSync("data/public/kinderkopjedb-public.sqlite")) copyFileSync("data/public/kinderkopjedb-public.sqlite", "dist/kinderkopjedb-public.sqlite");
 
 // to run the site from a folder: node serve.mjs (or start.cmd on Windows)
 copyFileSync("tools/serve.mjs", "dist/serve.mjs");
@@ -66,7 +66,7 @@ writeFileSync("dist/start.cmd", "@echo off\r\nnode serve.mjs\r\n");
 writeFileSync(
   "dist/README.txt",
   [
-    "Kinderkopje " + version,
+    "KinderkopjeDB " + version,
     "",
     "Run:  node serve.mjs   (or double-click start.cmd). Then open http://localhost:8765 in your browser.",
     "The pages keep their data in a SQLite database in your browser; save a copy from the Data page.",

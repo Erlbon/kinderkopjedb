@@ -3,13 +3,13 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Kinderkopje: Data</title>
+<title>KinderkopjeDB: Data</title>
 <link rel="icon" type="image/svg+xml" href="favicon.svg">
 <link rel="stylesheet" href="app.css?v=__BUILD__">
 </head>
 <body>
 <main>
-<header class="brand"><a href="index.html"><img src="favicon.svg" width="36" height="36" alt=""><span class="name">Kinderkopje - /r/Peloton's Data Collection Project</span></a></header>
+<header class="brand"><a href="index.html"><img src="favicon.svg" width="36" height="36" alt=""><span class="name">KinderkopjeDB - /r/Peloton's Data Collection Project</span></a></header>
 <h1>Data</h1>
 <nav><a href="index.html">Intro</a><a href="threads.html">Threads</a><a href="teams.html">Teams and points</a><a href="races.html">Races</a><a href="collect.html">Collect</a><a class="active" href="data.html">Data</a></nav>
 <div id="appstatus" class="warn"></div>
@@ -29,7 +29,7 @@
 <h2>Tables and fields</h2>
 <fieldset>
   <legend class="mut">What is in the database. The two views (v_team_points, v_results) are the easy way in. Open a table to see its fields and what they mean; the buttons ask a first question of it below.</legend>
-  <div class="row"><button id="dictmd">Copy this overview as Markdown</button><span class="mut">Download it:</span> <a href="kinderkopje-data-overview.html">HTML page</a> <a href="kinderkopje-data-overview.md">Markdown</a> <a href="kinderkopje-data-overview.json">JSON</a></div>
+  <div class="row"><button id="dictmd">Copy this overview as Markdown</button><span class="mut">Download it:</span> <a href="kinderkopjedb-data-overview.html">HTML page</a> <a href="kinderkopjedb-data-overview.md">Markdown</a> <a href="kinderkopjedb-data-overview.json">JSON</a></div>
   <div id="dict" style="margin-top:8px"></div>
 </fieldset>
 
@@ -38,7 +38,7 @@
   <legend class="mut">A SQLite file anyone can download and open in any SQLite tool: the rankings and the point-scoring results collected so far, with races (internal and external names), links, countries and continents. It holds names, nations, rider ages, places, points, team names, race names, race links and race facts: no layout, no photos. This is a <b>beta</b>: not every race is in it yet.</legend>
   <div id="pubstatus" style="margin:2px 0 8px">Looking for the published file ...</div>
   <div class="row">
-    <a id="publink" class="btn" href="kinderkopje-public.sqlite" download="kinderkopje-beta.sqlite">Download the beta database (.sqlite)</a>
+    <a id="publink" class="btn" href="kinderkopjedb-public.sqlite" download="kinderkopjedb-beta.sqlite">Download the beta database (.sqlite)</a>
     <button id="pubload">Search it here</button>
   </div>
   <div class="row" style="margin-top:8px">

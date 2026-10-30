@@ -1,5 +1,5 @@
 /**
- * What is in the Kinderkopje database, in plain language: every table and view, every column, how they link.
+ * What is in the KinderkopjeDB database, in plain language: every table and view, every column, how they link.
  * Shown on the Data page and kept honest by a test that compares it with the real schema.
  */
 
@@ -267,7 +267,7 @@ export const DICTIONARY: TableDoc[] = [
 export function dictionaryMarkdown(docs: TableDoc[] = DICTIONARY): string {
   const nl = String.fromCharCode(10);
   const out: string[] = [
-    "# Kinderkopje data: tables and fields",
+    "# KinderkopjeDB data: tables and fields",
     "",
     "Rankings, calendars and results come from the Union Cycliste Internationale (UCI): uci.org and DataRide. Team levels come from Wikipedia (CC BY-SA 4.0).",
     "",
@@ -296,7 +296,7 @@ export function dictionaryHtml(docs: TableDoc[] = DICTIONARY, version = ""): str
     "<head>",
     '<meta charset="utf-8">',
     '<meta name="viewport" content="width=device-width, initial-scale=1">',
-    "<title>Kinderkopje data: tables and fields</title>",
+    "<title>KinderkopjeDB data: tables and fields</title>",
     "<style>",
     ":root{--bg:#fff;--fg:#1c1c1c;--mut:#666;--line:#ddd;--acc:#c2410c;--code:#f3f4f6}",
     "@media (prefers-color-scheme:dark){:root{--bg:#121316;--fg:#eee;--mut:#9aa;--line:#33363d;--acc:#ff8a4c;--code:#1d1f24}}",
@@ -314,8 +314,8 @@ export function dictionaryHtml(docs: TableDoc[] = DICTIONARY, version = ""): str
     "</head>",
     "<body>",
     "<main>",
-    "<h1>Kinderkopje data: tables and fields</h1>",
-    '<p class="mut">What is in the Kinderkopje database (SQLite)' + (version ? ", " + esc(version) : "") + ". Open the Data page of the tool to ask it questions in SQL (read only). The two views, <code>v_team_points</code> and <code>v_results</code>, are the easy way in.</p>",
+    "<h1>KinderkopjeDB data: tables and fields</h1>",
+    '<p class="mut">What is in the KinderkopjeDB database (SQLite)' + (version ? ", " + esc(version) : "") + ". Open the Data page of the tool to ask it questions in SQL (read only). The two views, <code>v_team_points</code> and <code>v_results</code>, are the easy way in.</p>",
     '<p class="mut">Rankings, calendars and results come from the Union Cycliste Internationale (UCI): uci.org and DataRide. Team levels come from Wikipedia (CC BY-SA 4.0).</p>',
     "<ul>",
   );
@@ -339,5 +339,5 @@ export function dictionaryHtml(docs: TableDoc[] = DICTIONARY, version = ""): str
 
 /** The overview as JSON, for people who want to use it in their own tools. */
 export function dictionaryJson(docs: TableDoc[] = DICTIONARY, version = ""): string {
-  return JSON.stringify({ name: "Kinderkopje data overview", version, tables: docs }, null, 2) + String.fromCharCode(10);
+  return JSON.stringify({ name: "KinderkopjeDB data overview", version, tables: docs }, null, 2) + String.fromCharCode(10);
 }

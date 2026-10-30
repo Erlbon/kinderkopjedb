@@ -138,7 +138,7 @@ const SOCIAL: { prop: string; text: string; url: (v: string) => string }[] = [
 
 const API = "https://en.wikipedia.org/w/api.php";
 const WD = "https://www.wikidata.org/w/api.php";
-const HEADERS = { "Api-User-Agent": "Kinderkopje/0.1 (r/peloton moderator tool; github.com/Erlbon/kinderkopje)" };
+const HEADERS = { "Api-User-Agent": "KinderkopjeDB/0.1 (r/peloton moderator tool; github.com/Erlbon/kinderkopje)" };
 
 export async function fetchWikitext(title: string, f: typeof fetch = fetch): Promise<string> {
   const url = API + "?action=parse&prop=wikitext&format=json&formatversion=2&redirects=1&origin=*&page=" + encodeURIComponent(title);

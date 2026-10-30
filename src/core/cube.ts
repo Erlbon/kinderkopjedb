@@ -137,7 +137,7 @@ export function addCapture(cube: Cube, file: CaptureFile): ImportReport {
   const report: ImportReport = { added: 0, replaced: 0, races: 0, skipped: [] };
   const hasData = (a: unknown) => Array.isArray(a);
   if (!file || file.format !== "racethreads-capture/1" || !(hasData(file.snapshots) || hasData(file.raceResults) || hasData(file.competitions) || hasData(file.competitionEvents) || hasData(file.eventResults))) {
-    report.skipped.push("not a Kinderkopje capture file");
+    report.skipped.push("not a KinderkopjeDB capture file");
     return report;
   }
   for (const r of file.raceResults ?? []) {

@@ -65,7 +65,7 @@ export interface Store {
   setText(key: string, value: string): Promise<void>;
   deleteText(key: string): Promise<void>;
   exportBytes(): Uint8Array;
-  /** Replace everything with the contents of a .sqlite file. Throws if it is not a Kinderkopje database. */
+  /** Replace everything with the contents of a .sqlite file. Throws if it is not a KinderkopjeDB database. */
   importBytes(bytes: Uint8Array): Promise<void>;
   /** Delete everything and start with an empty database. */
   reset(): Promise<void>;

@@ -15,7 +15,7 @@ export const BETA_NOTE =
 /**
  * A copy of the database that is safe to publish: only the ranking and result tables, with the private parts
  * (saved texts, the capture queue, who captured a race and when) emptied and the file rewritten so that
- * nothing of them stays in unused pages. It keeps the schema, so any copy opens like a normal Kinderkopje file.
+ * nothing of them stays in unused pages. It keeps the schema, so any copy opens like a normal KinderkopjeDB file.
  */
 export function makePublicCopy(SQL: { Database: new (data?: ArrayLike<number>) => Database }, db: Database, note = ""): Uint8Array {
   const copy = openDatabase(SQL, db.export());

@@ -1,4 +1,4 @@
-# Kinderkopje
+# KinderkopjeDB
 
 Season YAML in, Reddit-ready race threads out. Built for the r/peloton moderators; the
 layout lives in a profile file, so other communities can reuse it.
@@ -31,7 +31,7 @@ to paste elsewhere. The views `v_team_points` and `v_results` are the easy way i
 
 ## Public beta database
 
-A SQLite file anyone can download from the Data page (`kinderkopje-public.sqlite`), published with the site. It is a **beta**:
+A SQLite file anyone can download from the Data page (`kinderkopjedb-public.sqlite`), published with the site. It is a **beta**:
 it holds what has been collected so far (men's elite first), and says so inside the file, together with how much it holds
 and when it was built. It has the races with their internal and external names, the results with the rider's age, the
 race links, and the country and continent of every UCI code. To build a new one from capture files:
@@ -40,7 +40,7 @@ race links, and the country and continent of every UCI code. To build a new one 
 npm run beta -- "path/to/uci-capture.json" --note "what is different about this build"
 ```
 
-It writes `data/public/kinderkopje-public.sqlite`; commit that file and the site build publishes it. Optional files add the
+It writes `data/public/kinderkopjedb-public.sqlite`; commit that file and the site build publishes it. Optional files add the
 join lines (`--aliases`), rename lines (`--renames`), stored links (`--links`, JSON) and the race registry (`--registry`)
 saved in the browser. Without them the races are not joined. The Data page button *Save a beta file from my own data*
 builds the same file from the browser's database, with its joins, names and links, for whoever publishes it.
@@ -50,7 +50,7 @@ builds the same file from the browser's database, with its joins, names and link
 The Data page can **Save a public copy** of your database: the ranking and result tables with names, nations, places,
 points, team names, race names, rider ages and race facts, and nothing else (saved texts, the capture queue, contributor
 names and capture times are removed, and the file is rewritten so they do not linger inside it). Put that file
-at `data/public/kinderkopje-public.sqlite` and commit it; the build then serves it as `kinderkopje-public.sqlite`, and
+at `data/public/kinderkopjedb-public.sqlite` and commit it; the build then serves it as `kinderkopjedb-public.sqlite`, and
 **Search the public dataset** on the Data page loads it and runs the SQL box against it. It is one static file read in
 the visitor's own browser, so there is no server to overload. The file carries the UCI and Wikipedia credits and a
 takedown contact (a GitHub issue).
@@ -58,7 +58,7 @@ takedown contact (a GitHub issue).
 ## Running it
 
 - **Online:** the GitHub Pages site (enabled from the repo settings: Pages, source GitHub Actions).
-- **From a folder (offline):** download `kinderkopje.zip` from the latest release, unzip it, run `node serve.mjs`
+- **From a folder (offline):** download `kinderkopjedb.zip` from the latest release, unzip it, run `node serve.mjs`
   (or double-click `start.cmd`) and open http://localhost:8765. Use that address rather than opening the files
   directly: browsers keep a separate database for each file opened from disk, so the pages would not share data.
 - **From the source:** `npm run build` then `npm start`.
@@ -79,7 +79,7 @@ First slice of the data cube: team ranking snapshots by date, from UCI DataRide.
 2. On DataRide open a *team ranking* page. Pick the season and date with the page's own dropdowns (the address
    does not change when you do, so links cannot select a season). Press the bookmark on each page of the table
    (40 teams per page). It copies only the rows already on screen and sends no requests of its own.
-3. Press *Download collection* in its box and open the file in Kinderkopje. Repeat for each date you want.
+3. Press *Download collection* in its box and open the file in KinderkopjeDB. Repeat for each date you want.
 
 The page then shows the seasons side by side (the latest ranking captured for each season), season to date against
 the same date last year, and points earned per month against last year. Rules: the ranking used for "the same date last year" is the latest one on or before that day, never a later
@@ -255,7 +255,7 @@ npm run build    # dist/index.html, one self-contained file
 Enable the hooks once per clone: `git config core.hooksPath .githooks`
 (pre-commit: control-character and syntax gate; pre-push: tests).
 
-Releases: tag `v0.1.0` and push the tag; the workflow attaches `kinderkopje.zip`.
+Releases: tag `v0.1.0` and push the tag; the workflow attaches `kinderkopjedb.zip`.
 
 ## Licence
 
