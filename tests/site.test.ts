@@ -63,8 +63,8 @@ describe("the intro page", () => {
   });
   it("names the code, the licence, the data credits, and that it is not affiliated with UCI or Reddit", () => {
     const html = read("src/site/index.html");
-    expect(html).toContain("https://github.com/Erlbon/kinderkopje");
-    expect(html).toContain("https://github.com/Erlbon/kinderkopje/issues");
+    expect(html).toContain("https://github.com/Erlbon/kinderkopjedb");
+    expect(html).toContain("https://github.com/Erlbon/kinderkopjedb/issues");
     for (const text of ["MIT licence", "CC BY-SA 4.0", "Not affiliated", "nothing is uploaded"]) expect(html, text).toContain(text);
   });
   it("says plainly that FirstCycling is deliberately not scraped, and does not mention ProCyclingStats", () => {

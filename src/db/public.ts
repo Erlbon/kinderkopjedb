@@ -2,7 +2,7 @@ import type { Database } from "sql.js";
 import { openDatabase } from "./cube-db";
 
 /** Where people can ask for something to be removed from the public dataset. */
-export const TAKEDOWN_URL = "https://github.com/Erlbon/kinderkopje/issues";
+export const TAKEDOWN_URL = "https://github.com/Erlbon/kinderkopjedb/issues";
 
 export const PUBLIC_CREDITS =
   "Rankings and race results are published by the Union Cycliste Internationale (UCI) on uci.org and dataride.uci.ch; team levels come from Wikipedia (CC BY-SA 4.0); the links of a race (official site, Wikipedia, social media) come from Wikidata (CC0) after a person checked the match, from the race registry, or were typed in. " +
