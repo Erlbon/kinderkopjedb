@@ -27,13 +27,14 @@ import {
   isComplete,
   isOtherCategory,
   mergeEvents,
-  missingEventsInOrder,
   missingJerseyEvents,
   nextPageToOpen,
   pageKind,
+  racePages,
   readCompetitionEvents,
   readCompetitionList,
   readEventResults,
+  workListFromHash,
 } from "../src/core/dataride";
 
 (function () {
@@ -41,6 +42,7 @@ import {
   // files already downloaded, must keep working.
   var STORE = "racethreads-capture-uci";
   var SKIP_STORE = "racethreads-capture-uci-skip";
+  var WORK_STORE = "racethreads-capture-uci-work";
   var FORMAT = "racethreads-capture/1";
   var COUNTDOWN = 5; // seconds before the next page opens by itself
   var FRAME_PAUSE = 1500; // ms between two pages read in the hidden frame
@@ -68,6 +70,24 @@ import {
       v = JSON.parse(localStorage.getItem(SKIP_STORE) || "null");
     } catch (e) {}
     return { competitions: (v && v.competitions) || [], events: (v && v.events) || [] };
+  }
+  // the work list from KinderkopjeDB's queue: it comes in the address of a race you open from the Collect page, and is
+  // kept until a newer one comes
+  function loadWork() {
+    try {
+      return JSON.parse(localStorage.getItem(WORK_STORE) || "null") || [];
+    } catch (e) {
+      return [];
+    }
+  }
+  function takeWork() {
+    var w = workListFromHash(location.hash);
+    if (w) localStorage.setItem(WORK_STORE, JSON.stringify(w));
+  }
+  function workItem(competitionId) {
+    var w = loadWork();
+    for (var i = 0; i < w.length; i++) if (w[i].c === competitionId) return w[i];
+    return undefined;
   }
   function skip(kind, id) {
     var s = loadSkips();
@@ -162,7 +182,14 @@ import {
       return;
     }
     // the suggested next page: always a button to open it, and with opts.next a countdown that opens it by itself
-    var next = opts.next || opts.todo ? nextPageToOpen(c, opts.todo, loadSkips()) : undefined;
+    var work = loadWork();
+    var next = opts.next || opts.todo ? nextPageToOpen(c, opts.todo, loadSkips(), work) : undefined;
+    var workEl = document.createElement("div");
+    workEl.style.cssText = "margin-top:6px;color:#555";
+    workEl.textContent = work.length
+      ? "Following your KinderkopjeDB queue (" + work.length + " race editions when you opened it)."
+      : "No queue from KinderkopjeDB: open a race from the Collect page's queue and the bookmark goes on to the next race of the queue by itself.";
+    box.appendChild(workEl);
     if (next) {
       var nextEl = document.createElement("div");
       nextEl.style.cssText = "margin-top:8px;font-weight:bold;color:#c2410c";
@@ -196,10 +223,13 @@ import {
     } else if (opts.next) {
       var doneEl = document.createElement("div");
       doneEl.style.cssText = "margin-top:8px;font-weight:bold";
-      doneEl.textContent = "Nothing is left to open: every race in the collection is captured or skipped.";
+      doneEl.textContent = work.length
+        ? "Nothing is left to open: every race of the queue is captured or skipped. Download the collection and open it in KinderkopjeDB."
+        : "Nothing is left to open in this race.";
       box.appendChild(doneEl);
     }
-    if (opts.todo && missingEventsInOrder(c, opts.todo, loadSkips().events).length) {
+    var pages = opts.todo ? racePages(c, opts.todo, workItem(opts.todo), loadSkips().events) : null;
+    if (pages && (pages.competitionPage || pages.events.length)) {
       btn("Get everything for this race", function () {
         everything(opts.todo);
       });
@@ -207,7 +237,7 @@ import {
     if (opts.skip) {
       btn("Skip this " + opts.skip.label + " and go on", function () {
         skip(opts.skip.kind, opts.skip.id);
-        var n = nextPageToOpen(load(), opts.todo, loadSkips());
+        var n = nextPageToOpen(load(), opts.todo, loadSkips(), loadWork());
         if (n) location.href = n.path;
         else overlay("Skipped. Nothing else is left to open.", load(), false);
       });
@@ -374,9 +404,8 @@ import {
       progress(t, c);
     };
     overlay("Getting everything for this race ...", c, true);
-    var ce = null;
-    for (var i = 0; i < c.competitionEvents.length; i++) if (c.competitionEvents[i].competitionId === competitionId) ce = c.competitionEvents[i];
-    if (!hasEventList(ce)) {
+    var item = workItem(competitionId);
+    if (racePages(c, competitionId, item, loadSkips().events).competitionPage) {
       say("Opening the race's competition page ...");
       await inFrame(
         competitionPagePath(competitionId),
@@ -389,7 +418,12 @@ import {
         },
       );
     }
-    var todo = missingEventsInOrder(c, competitionId, loadSkips().events);
+    var names = {};
+    for (var i = 0; i < c.competitionEvents.length; i++)
+      if (c.competitionEvents[i].competitionId === competitionId) c.competitionEvents[i].events.forEach(function (x) { names[x.id] = x.name; });
+    var todo = racePages(c, competitionId, item, loadSkips().events).events.map(function (id) {
+      return { id: id, name: names[id] || "event " + id };
+    });
     var got = 0;
     var failed = [];
     for (var n = 0; n < todo.length && !stopped; n++) {
@@ -420,6 +454,7 @@ import {
 
   async function run(force) {
     stopped = false;
+    takeWork();
     var c = load();
     var kind = pageKind(location.pathname);
     var say = function (t) {

@@ -2,7 +2,7 @@ import { buildSync } from "esbuild";
 import { parseHTML } from "linkedom";
 import { runInNewContext } from "node:vm";
 import { describe, expect, it } from "vitest";
-import { competitionPagePath, eventPagePath } from "../src/core";
+import { competitionPagePath, encodeWorkList, eventPagePath } from "../src/core";
 
 // the capture bookmark as the build bundles it, run on a fake DataRide page
 const bundle = buildSync({ entryPoints: ["tools/capture-uci-race.js"], bundle: true, format: "iife", target: "es2017", write: false, logLevel: "warning" }).outputFiles[0].text;
@@ -22,10 +22,10 @@ const collection = {
   eventResults: [],
 };
 
-async function pressBookmark(pathname: string, search = "") {
+async function pressBookmark(pathname: string, search = "", hash = "") {
   const { document } = parseHTML("<!doctype html><html><head></head><body></body></html>");
   const store: Record<string, string> = { "racethreads-capture-uci": JSON.stringify(collection) };
-  const location = { pathname, search, href: "https://dataride.uci.ch" + pathname + search };
+  const location = { pathname, search, hash, href: "https://dataride.uci.ch" + pathname + search + hash };
   const timers: (() => void)[] = [];
   runInNewContext(bundle, {
     document,
@@ -67,6 +67,17 @@ describe("the capture bookmark's box", () => {
     page.button(/Download/)!.click();
     for (let i = 0; i < 10; i++) page.tick();
     expect(page.location.href).toBe(eventPagePath(2, 23));
+  });
+
+  it("follows the queue it was opened from: on to the queue's next race, never to a race outside it", async () => {
+    const work = encodeWorkList([
+      { c: 2, name: "Tour of Guangxi 2026", events: [23] },
+      { c: 8, name: "Il Lombardia 2026", events: [81, 82] },
+    ]);
+    // event 23 is the race's last page in the queue: it has no table here, so it is skipped and the queue goes on
+    const page = await pressBookmark("/iframe/EventResults/23", "?competitionId=2&disciplineId=10", "#kdb=" + encodeURIComponent(work));
+    page.button(/Skip this page/)!.click();
+    expect(page.location.href).toBe(eventPagePath(8, 81));
   });
 
   it("goes to the race's competition page when its events are not known yet", async () => {

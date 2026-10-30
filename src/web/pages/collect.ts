@@ -1,5 +1,5 @@
 import { FinderOptions, currentRaces, initLinkFinder, linksBlock } from "./race-links";
-import { CATEGORY_NAMES, JoinSuggestion, QueueLine, buildRaces, chainLines, normRaceName, parseRaceAliases, queueByRace, suggestJoins } from "../../core";
+import { CATEGORY_NAMES, JoinSuggestion, QueueLine, WorkItem, buildRaces, chainLines, encodeWorkList, missingJerseyEvents, normRaceName, parseRaceAliases, queueByRace, suggestJoins } from "../../core";
 import { importCaptureFiles } from "../capture-import";
 import { $, el, tick } from "../dom";
 import type { Store } from "../store";
@@ -74,6 +74,39 @@ export function initCollect(store: Store, options: FinderOptions = {}): void {
     return [e.eventsComplete + "/" + e.eventsKnown + " events", waiting ? waiting + " captured event(s) filled a whole page of the table: capture the next page" : e.eventsCaptured < e.eventsKnown ? "events still to capture" : "all events captured"];
   }
 
+  /**
+   * The work list for the capture bookmark: the races the queue shows, in its order, newest edition first, each with the
+   * pages still to read when its events are known (the next page of a table first, then the missing results, leader and
+   * final pages). It goes with a DataRide link when you open it, after the "#", so it never reaches DataRide's server.
+   */
+  let workEditions: { name: string; editions: QueueLine[] }[] = [];
+  function workList(): WorkItem[] {
+    const captured = new Map<number, number[]>();
+    for (const r of cube().raceResults ?? []) captured.set(r.uciId, r.classifications.map((c) => c.eventId ?? 0));
+    const out: WorkItem[] = [];
+    for (const r of workEditions) {
+      for (const e of [...r.editions].sort((a, b) => b.year - a.year)) {
+        const name = r.name + " " + e.year;
+        if (!e.events?.length) {
+          out.push({ c: e.uciId, name });
+          continue;
+        }
+        const m = missingJerseyEvents(e.events, captured.get(e.uciId) ?? []);
+        const events = [...e.waitingEvents, ...m.results, ...m.leader, ...m.final].map((x) => x.id).filter((id, i, a) => id > 0 && a.indexOf(id) === i);
+        if (events.length) out.push({ c: e.uciId, name, events });
+      }
+    }
+    return out;
+  }
+  // a DataRide link in the queue gets the work list when it is pressed (the mouse button going down comes before the
+  // click, a middle click and the right-click menu)
+  const withWork = (ev: Event) => {
+    const a = (ev.target as Element | null)?.closest?.("a[href^='https://dataride.uci.ch/']");
+    if (a) a.setAttribute("href", (a.getAttribute("href") ?? "").split("#")[0] + "#kdb=" + encodeURIComponent(encodeWorkList(workList())));
+  };
+  $("queueout").addEventListener("mousedown", withWork);
+  $("queueout").addEventListener("keydown", withWork);
+
   function draw(): void {
     const all = queueByRace(cube(), store.getText("racealiases") ?? "");
     // each race with its internal name and its external names
@@ -108,6 +141,7 @@ export function initCollect(store: Store, options: FinderOptions = {}): void {
     rows = [...rows].sort((a, b) =>
       sort === "class" ? tier(newestClass(a)) - tier(newestClass(b)) || internal(a).localeCompare(internal(b)) : sort === "todo" ? unfinished(b) - unfinished(a) || internal(a).localeCompare(internal(b)) : internal(a).localeCompare(internal(b)),
     );
+    workEditions = rows.map((r) => ({ name: internal(r), editions: Object.values(r.editions) }));
     // say what the two filters are hiding, with a way to show it
     const hiddenDone = races.length - rows.length;
     const hiddenClass = inCategory.length - races.length;

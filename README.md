@@ -129,8 +129,10 @@ Per-race results come from DataRide, UCI's results site (`dataride.uci.ch`). One
 
 The bookmark clicks only the page's own controls (a row's triangle, the next-page button), one click at a time with a
 pause, as you would, and has a Stop button. After a competition or a complete event it opens the next missing page by
-itself after a 5-second countdown (this race's pages first, then the next race in the list; *Stay here* cancels), so you
-press the bookmark once per page. *Get everything for this race* reads all of the race's missing pages in a hidden frame,
+itself after a 5-second countdown (*Stay here* cancels, *Open the next page* goes on), so you press the bookmark once
+per page. This race's pages come first, then the next race of the Collect page's queue: a DataRide link opened from the
+queue carries the queue's races (as filtered and sorted) and the pages each still needs after `#kdb=` (never sent to
+DataRide), and the bookmark keeps that list. Opened any other way, the bookmark stays in the race. *Get everything for this race* reads all of the race's missing pages in a hidden frame,
 one page at a time with a pause, for the long stage races. Pages and races that never load can be skipped. It never
 calls DataRide's data service itself: each page loads its own data. The clicking is in `src/core/autopilot.ts`, the
 order of the pages in `nextPageToOpen` (`src/core/dataride.ts`).
