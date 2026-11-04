@@ -60,6 +60,7 @@ export interface ResultClassification {
   label: string; // the section opened on the page ("Final Classification", a stage ...)
   title: string; // "General Classification"
   eventId?: number; // DataRide's number for the event, when the rows came from a DataRide event page
+  date?: string; // ISO day of the event, from the event page's heading
   totalRows: number; // rows in the table, only the point-scoring ones are kept in `rows`
   rows: ResultRow[];
 }
@@ -71,6 +72,8 @@ export interface RaceResult {
   class?: string;
   classText?: string;
   dates?: string;
+  start?: string; // ISO first and last day: DataRide's competition list, else the first and last event date (fillRaceDates)
+  end?: string;
   country?: string;
   capturedAt?: string;
   contributor?: string; // who captured it, when it came from a helper moderator
@@ -241,15 +244,39 @@ export function mergeEventResult(cube: Cube, e: DrEventResult): void {
   const label = q?.events?.find((x) => x.id === e.eventId)?.name || "Event " + e.eventId;
   const have = race.classifications.find((c) => c.eventId === e.eventId);
   if (!have) {
-    race.classifications.push({ label, title: heading || label, eventId: e.eventId, totalRows: e.totalRows, rows: e.rows });
+    race.classifications.push({ label, title: heading || label, eventId: e.eventId, ...(e.date ? { date: e.date } : {}), totalRows: e.totalRows, rows: e.rows });
     return;
   }
+  // a capture imported again brings the date to a classification stored before dates were kept
+  if (e.date) have.date = e.date;
   const key = (r: { rank: number | null; rider: string }) => r.rank + "|" + r.rider;
   const rows = new Map(have.rows.map((r) => [key(r), r]));
   for (const r of e.rows) rows.set(key(r), r);
   have.rows = [...rows.values()].sort((a, b) => (a.rank ?? 1e9) - (b.rank ?? 1e9));
   have.totalRows = Math.max(have.totalRows, e.totalRows);
   have.label = label;
+}
+
+/**
+ * The first and last day of each captured race: from DataRide's competition list when it was captured, else from the
+ * first and last event date. An event of a one-day race without its own date gets the race's day.
+ */
+export function fillRaceDates(cube: Cube): void {
+  const queue = new Map((cube.queue ?? []).map((q) => [q.uciId, q] as [number, QueueRace]));
+  for (const r of cube.raceResults ?? []) {
+    const q = queue.get(r.uciId);
+    if (q?.start && q.end) {
+      r.start = q.start;
+      r.end = q.end;
+    } else {
+      const days = r.classifications.map((c) => c.date).filter((d): d is string => !!d).sort();
+      if (days.length) {
+        r.start = days[0];
+        r.end = days[days.length - 1];
+      }
+    }
+    if (r.start && r.start === r.end) for (const c of r.classifications) c.date ??= r.start;
+  }
 }
 
 /** Add or update one race's results; classifications with the same label and title are replaced. */

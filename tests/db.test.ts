@@ -163,3 +163,49 @@ describe("upgrading an older database", () => {
     expect(loadCube(db).raceResults![0]!.contributor).toBe("A Helper");
   });
 });
+
+describe("race and event dates", () => {
+  const rows = [{ rank: 1, rider: "A", team: "T", age: 20, nation: "ITA", result: "x", points: 5 }];
+  const stage = (eventId: number, date?: string) => ({ competitionId: 9, eventId, heading: "Tour Stage", totalRows: 30, rows, ...(date ? { date } : {}) });
+
+  it("importing a capture file again adds the event dates, without adding rows", () => {
+    const cube = emptyCube();
+    // as stored before dates were kept
+    addCapture(cube, { format: "racethreads-capture/1", eventResults: [stage(91), stage(92)] });
+    expect(cube.raceResults![0]!.classifications.map((c) => c.date)).toEqual([undefined, undefined]);
+    addCapture(cube, { format: "racethreads-capture/1", eventResults: [stage(91, "2026-10-13"), stage(92, "2026-10-15")] });
+    const race = cube.raceResults![0]!;
+    expect(race.classifications.map((c) => [c.date, c.rows.length])).toEqual([["2026-10-13", 1], ["2026-10-15", 1]]);
+  });
+
+  it("a race's first and last day come from the competition list, else from its events; a one-day race dates its events", () => {
+    const cube = emptyCube();
+    addCapture(cube, { format: "racethreads-capture/1", eventResults: [stage(91, "2026-10-13"), stage(92, "2026-10-15")] });
+    addCapture(cube, { format: "racethreads-capture/1", eventResults: [{ ...stage(81), competitionId: 8 }] });
+    addCapture(cube, { format: "racethreads-capture/1", competitions: [{ id: 8, name: "One Day", start: "2026-10-10", end: "2026-10-10", year: 2026, country: "ITA", class: "1.Pro", inProgress: false }] });
+    const db = openDatabase(SQL);
+    saveCube(db, cube);
+    const back = loadCube(openDatabase(SQL, db.export()));
+    const byId = new Map(back.raceResults!.map((r) => [r.uciId, r]));
+    expect(byId.get(9)).toMatchObject({ start: "2026-10-13", end: "2026-10-15" });
+    expect(byId.get(8)).toMatchObject({ start: "2026-10-10", end: "2026-10-10" });
+    expect(byId.get(8)!.classifications[0]!.date).toBe("2026-10-10");
+    expect(db.exec("SELECT DISTINCT date FROM v_results WHERE uci_id = 9 ORDER BY date")[0]!.values).toEqual([["2026-10-13"], ["2026-10-15"]]);
+  });
+
+  it("a version 6 database gets the date columns, and its races get their days from the queue on opening", async () => {
+    const { MIGRATIONS } = await import("../src/db");
+    const old = new SQL.Database();
+    for (let v = 1; v <= 6; v++) old.exec(MIGRATIONS[v]!);
+    old.run("INSERT INTO meta(key, value) VALUES ('schema_version', '6')");
+    old.run("INSERT INTO race_result(uci_id, year, name) VALUES (8, 2026, 'One Day')");
+    old.run("INSERT INTO classification(uci_id, label, title, total_rows, event_id) VALUES (8, 'Final', 'Result', 30, 81)");
+    old.run("INSERT INTO queue_race(uci_id, year, name, start, end, country, hub) VALUES (8, 2026, 'One Day', '2026-10-10', '2026-10-10', 'ITA', 'DataRide')");
+    const upgraded = openDatabase(SQL, old.export());
+    const cube = loadCube(upgraded);
+    expect(cube.raceResults![0]).toMatchObject({ start: "2026-10-10", end: "2026-10-10" });
+    expect(cube.raceResults![0]!.classifications[0]!.date).toBe("2026-10-10");
+    saveCube(upgraded, cube);
+    expect(upgraded.exec("SELECT start, end FROM race_result")[0]!.values).toEqual([["2026-10-10", "2026-10-10"]]);
+  });
+});
