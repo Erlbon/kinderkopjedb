@@ -271,87 +271,29 @@ export function missingEventsInOrder(c: { competitionEvents: DrCompetitionEvents
   return [...m.results, ...m.leader, ...m.final];
 }
 
-/**
- * One race (edition) of the work list the Collect page's queue hands to the capture bookmark: the races the queue shows
- * with your filters, in its order. `events` are the pages still to read when the database knows the race's events (the
- * next page of a table first, then the missing results, leader and final pages); without it the competition page is
- * opened first to learn them.
- */
-export interface WorkItem {
-  c: number;
-  name: string;
-  events?: number[];
-}
-
-/** The work list as text for a link: "id~name~event.event,id~name". "~" and "," in names become spaces. */
-export function encodeWorkList(items: WorkItem[]): string {
-  return items.map((w) => w.c + "~" + w.name.replace(/[~,]/g, " ") + (w.events?.length ? "~" + w.events.join(".") : "")).join(",");
-}
-
-export function decodeWorkList(text: string): WorkItem[] {
-  const out: WorkItem[] = [];
-  for (const part of text.split(",")) {
-    const [id, name, events] = part.split("~");
-    const c = Number(id);
-    if (!part || !Number.isInteger(c) || c <= 0) continue;
-    const item: WorkItem = { c, name: name || "Competition " + c };
-    const ids = (events ?? "").split(".").map(Number).filter((n) => Number.isInteger(n) && n > 0);
-    if (ids.length) item.events = ids;
-    out.push(item);
-  }
-  return out;
-}
-
-/** The work list in a page address's "#kdb=..." part (the part after # never goes to the server). */
-export function workListFromHash(hash: string): WorkItem[] | undefined {
-  const m = /[#&]kdb=([^&]*)/.exec(hash);
-  if (!m) return undefined;
-  try {
-    return decodeWorkList(decodeURIComponent(m[1]));
-  } catch {
-    return undefined;
-  }
-}
-
 type Collection = { competitions: DrCompetition[]; competitionEvents: DrCompetitionEvents[]; eventResults: { competitionId: number; eventId: number }[] };
 
 /**
- * The pages of one race still to open: the work list's pages when it has them, else the missing pages of the event list
- * saved in this browser, else the competition page (to learn the events). Pages captured in this browser or skipped are
- * left out.
+ * The pages of one race still to open: the missing pages of the event list saved in this browser, else the competition
+ * page (to learn the events). Pages captured in this browser or skipped are left out.
  */
-export function racePages(c: Collection, competitionId: number, item?: WorkItem, skipEvents: number[] = []): { competitionPage: boolean; events: number[] } {
-  if (item?.events) {
-    const have = new Set([...c.eventResults.filter((r) => r.competitionId === competitionId).map((r) => r.eventId), ...skipEvents]);
-    return { competitionPage: false, events: item.events.filter((id) => !have.has(id)) };
-  }
+export function racePages(c: Collection, competitionId: number, skipEvents: number[] = []): { competitionPage: boolean; events: number[] } {
   if (!hasEventList(c.competitionEvents.find((x) => x.competitionId === competitionId))) return { competitionPage: true, events: [] };
   return { competitionPage: false, events: missingEventsInOrder(c, competitionId, skipEvents).map((e) => e.id) };
 }
 
 /**
- * The next page to open after a capture: the race it came from first, then the races of the work list after it (and then
- * the ones before it). Without a work list it stays in the race it came from: the bookmark's own list of competitions
- * holds every class and knows nothing of what the database already has. Skipped races and pages are left out.
- * Undefined when nothing is left.
+ * The next page to open after a capture: only in the race it came from, never in another race. Skipped races and pages
+ * are left out. Undefined when nothing is left.
  */
-export function nextPageToOpen(c: Collection, from?: number, skip: CaptureSkips = { competitions: [], events: [] }, work: WorkItem[] = []): { path: string; label: string } | undefined {
-  const names = new Map(c.competitions.map((x) => [x.id, x.name]));
-  const at = work.findIndex((w) => w.c === from);
-  const order: { c: number; item?: WorkItem }[] = [
-    ...(from !== undefined ? [{ c: from, item: at >= 0 ? work[at] : undefined }] : []),
-    ...[...work.slice(at + 1), ...work.slice(0, Math.max(at, 0))].map((w) => ({ c: w.c, item: w })),
-  ];
-  for (const { c: id, item } of order) {
-    if (skip.competitions.includes(id)) continue;
-    const name = item?.name ?? names.get(id) ?? "Competition " + id;
-    const p = racePages(c, id, item, skip.events);
-    if (p.competitionPage) return { path: competitionPagePath(id), label: name };
-    if (!p.events.length) continue;
-    const known = c.competitionEvents.find((x) => x.competitionId === id)?.events.find((e) => e.id === p.events[0]);
-    return { path: eventPagePath(id, p.events[0]), label: name + ": " + (known ? known.name : p.events.length + " page" + (p.events.length === 1 ? "" : "s") + " still to capture") };
-  }
-  return undefined;
+export function nextPageToOpen(c: Collection, from?: number, skip: CaptureSkips = { competitions: [], events: [] }): { path: string; label: string } | undefined {
+  if (from === undefined || skip.competitions.includes(from)) return undefined;
+  const name = c.competitions.find((x) => x.id === from)?.name ?? "Competition " + from;
+  const p = racePages(c, from, skip.events);
+  if (p.competitionPage) return { path: competitionPagePath(from), label: name };
+  if (!p.events.length) return undefined;
+  const known = c.competitionEvents.find((x) => x.competitionId === from)?.events.find((e) => e.id === p.events[0]);
+  return { path: eventPagePath(from, p.events[0]), label: name + ": " + (known ? known.name : p.events.length + " page" + (p.events.length === 1 ? "" : "s") + " still to capture") };
 }
 
 /** Rows in one page of a DataRide table. */

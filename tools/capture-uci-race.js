@@ -10,11 +10,12 @@
  *   - on the list, the "next page" button, until the last page
  *   - on a competition page, the triangle of each closed row (stages, final classification), then the next page
  *   - on an event page, the "next page" button while every row on the page scored points
- * After a competition or a complete event it opens the next missing page by itself after a short countdown (this race's
- * missing pages first, then the next race of the list), so you only press the bookmark once per page; "Stay here" stops it.
+ * After a competition or a complete event it opens the next missing page of the same race by itself after a short
+ * countdown, so you only press the bookmark once per page; "Stay here" stops it. It never goes on to another race.
  * "Get everything for this race" reads all of the race's missing pages in a hidden frame on this page, one page at a time
  * with a pause, as if you opened each one. Nothing here calls DataRide's data service itself: each page loads its own
  * data as it does for you. The Stop button ends it at once. Then download the collection and open it in KinderkopjeDB.
+ * The collection is kept in dataride.uci.ch's IndexedDB in your browser (localStorage is too small for a season).
  *
  * Reading the pages is done by src/core/dataride.ts and the clicking by src/core/autopilot.ts, the code the tests cover;
  * the build bundles them here.
@@ -34,7 +35,6 @@ import {
   readCompetitionEvents,
   readCompetitionList,
   readEventResults,
-  workListFromHash,
 } from "../src/core/dataride";
 
 (function () {
@@ -42,26 +42,120 @@ import {
   // files already downloaded, must keep working.
   var STORE = "racethreads-capture-uci";
   var SKIP_STORE = "racethreads-capture-uci-skip";
-  var WORK_STORE = "racethreads-capture-uci-work";
   var FORMAT = "racethreads-capture/1";
   var COUNTDOWN = 5; // seconds before the next page opens by itself
   var FRAME_PAUSE = 1500; // ms between two pages read in the hidden frame
   var stopped = false;
   var timer = null;
 
-  function load() {
-    var v = null;
+  // The collection lives in this site's IndexedDB: localStorage holds only about 5 MB per site, which a season of
+  // results outgrows. A collection from an earlier version of the bookmark is moved over from localStorage once.
+  // `cache` is the collection in memory; every save writes it out, and `written` waits for the writes so far.
+  var DB_NAME = "kinderkopjedb-capture";
+  var DB_STORE = "kv";
+  var db = null;
+  var cache = null;
+  var written = Promise.resolve();
+  var saveError = "";
+
+  function idb(mode, act) {
+    return new Promise(function (resolve, reject) {
+      var tx = db.transaction(DB_STORE, mode);
+      var req = act(tx.objectStore(DB_STORE));
+      tx.oncomplete = function () {
+        resolve(req.result);
+      };
+      tx.onerror = tx.onabort = function () {
+        reject(tx.error || req.error || new Error("the browser's database refused the write"));
+      };
+    });
+  }
+  function openDb() {
+    return new Promise(function (resolve) {
+      if (typeof indexedDB === "undefined") return resolve(null);
+      var req;
+      try {
+        req = indexedDB.open(DB_NAME, 1);
+      } catch (e) {
+        return resolve(null);
+      }
+      req.onupgradeneeded = function () {
+        req.result.createObjectStore(DB_STORE);
+      };
+      req.onsuccess = function () {
+        resolve(req.result);
+      };
+      req.onerror = function () {
+        resolve(null);
+      };
+    });
+  }
+  async function openStore() {
+    db = await openDb();
+    var old = null;
     try {
-      v = JSON.parse(localStorage.getItem(STORE) || "null");
+      old = JSON.parse(localStorage.getItem(STORE) || "null");
     } catch (e) {}
+    if (!db) {
+      cache = old;
+      return;
+    }
+    cache = await idb("readonly", function (s) {
+      return s.get(STORE);
+    });
+    if (old && !cache) {
+      cache = old;
+      await idb("readwrite", function (s) {
+        return s.put(old, STORE);
+      });
+    }
+    // the old copy goes once the database holds the collection; it is what filled localStorage up
+    if (old && cache) {
+      try {
+        localStorage.removeItem(STORE);
+      } catch (e) {}
+    }
+  }
+  function load() {
+    var v = cache;
     if (!v || v.format !== FORMAT) v = { format: FORMAT, source: "dataride.uci.ch" };
     v.competitions = v.competitions || [];
     v.competitionEvents = v.competitionEvents || [];
     v.eventResults = v.eventResults || [];
+    cache = v;
     return v;
   }
   function save(c) {
-    localStorage.setItem(STORE, JSON.stringify(c));
+    cache = c;
+    if (!db) {
+      localStorage.setItem(STORE, JSON.stringify(c));
+      return;
+    }
+    written = written.then(function () {
+      return idb("readwrite", function (s) {
+        return s.put(c, STORE);
+      }).catch(function (e) {
+        saveError = "Saving failed: " + (e && e.message ? e.message : e) + ". Download the collection now.";
+      });
+    });
+  }
+  function clearCollection() {
+    cache = null;
+    try {
+      localStorage.removeItem(STORE);
+    } catch (e) {}
+    if (db)
+      written = written.then(function () {
+        return idb("readwrite", function (s) {
+          return s.delete(STORE);
+        }).catch(function () {});
+      });
+  }
+  // a new page loads only after the collection is written out: leaving the page could cut a write off
+  function openPage(path) {
+    written.then(function () {
+      location.href = path;
+    });
   }
   // pages and races you chose to skip; kept apart from the collection so the capture file stays as it was
   function loadSkips() {
@@ -70,24 +164,6 @@ import {
       v = JSON.parse(localStorage.getItem(SKIP_STORE) || "null");
     } catch (e) {}
     return { competitions: (v && v.competitions) || [], events: (v && v.events) || [] };
-  }
-  // the work list from KinderkopjeDB's queue: it comes in the address of a race you open from the Collect page, and is
-  // kept until a newer one comes
-  function loadWork() {
-    try {
-      return JSON.parse(localStorage.getItem(WORK_STORE) || "null") || [];
-    } catch (e) {
-      return [];
-    }
-  }
-  function takeWork() {
-    var w = workListFromHash(location.hash);
-    if (w) localStorage.setItem(WORK_STORE, JSON.stringify(w));
-  }
-  function workItem(competitionId) {
-    var w = loadWork();
-    for (var i = 0; i < w.length; i++) if (w[i].c === competitionId) return w[i];
-    return undefined;
   }
   function skip(kind, id) {
     var s = loadSkips();
@@ -98,7 +174,7 @@ import {
   var msgEl = null;
   var infoEl = null;
   function counts(c) {
-    return "Collection: " + c.competitions.length + " competitions, " + c.competitionEvents.length + " event lists, " + c.eventResults.length + " event results";
+    return "Collection: " + c.competitions.length + " competitions, " + c.competitionEvents.length + " event lists, " + c.eventResults.length + " event results" + (saveError ? ". " + saveError : "");
   }
 
   // the pages of one competition that are known (from its saved event list) but not captured yet
@@ -182,14 +258,7 @@ import {
       return;
     }
     // the suggested next page: always a button to open it, and with opts.next a countdown that opens it by itself
-    var work = loadWork();
-    var next = opts.next || opts.todo ? nextPageToOpen(c, opts.todo, loadSkips(), work) : undefined;
-    var workEl = document.createElement("div");
-    workEl.style.cssText = "margin-top:6px;color:#555";
-    workEl.textContent = work.length
-      ? "Following your KinderkopjeDB queue (" + work.length + " race editions when you opened it)."
-      : "No queue from KinderkopjeDB: open a race from the Collect page's queue and the bookmark goes on to the next race of the queue by itself.";
-    box.appendChild(workEl);
+    var next = opts.next || opts.todo ? nextPageToOpen(c, opts.todo, loadSkips()) : undefined;
     if (next) {
       var nextEl = document.createElement("div");
       nextEl.style.cssText = "margin-top:8px;font-weight:bold;color:#c2410c";
@@ -197,7 +266,7 @@ import {
       var go = function () {
         cancelCountdown();
         nextEl.textContent = "Opening " + next.label + " ...";
-        location.href = next.path;
+        openPage(next.path);
       };
       var still = function () {
         nextEl.textContent = "Next missing page: " + next.label;
@@ -223,12 +292,10 @@ import {
     } else if (opts.next) {
       var doneEl = document.createElement("div");
       doneEl.style.cssText = "margin-top:8px;font-weight:bold";
-      doneEl.textContent = work.length
-        ? "Nothing is left to open: every race of the queue is captured or skipped. Download the collection and open it in KinderkopjeDB."
-        : "Nothing is left to open in this race.";
+      doneEl.textContent = "Nothing is left to open in this race. Open the next race from KinderkopjeDB's queue yourself.";
       box.appendChild(doneEl);
     }
-    var pages = opts.todo ? racePages(c, opts.todo, workItem(opts.todo), loadSkips().events) : null;
+    var pages = opts.todo ? racePages(c, opts.todo, loadSkips().events) : null;
     if (pages && (pages.competitionPage || pages.events.length)) {
       btn("Get everything for this race", function () {
         everything(opts.todo);
@@ -237,8 +304,8 @@ import {
     if (opts.skip) {
       btn("Skip this " + opts.skip.label + " and go on", function () {
         skip(opts.skip.kind, opts.skip.id);
-        var n = nextPageToOpen(load(), opts.todo, loadSkips(), loadWork());
-        if (n) location.href = n.path;
+        var n = nextPageToOpen(load(), opts.todo, loadSkips());
+        if (n) openPage(n.path);
         else overlay("Skipped. Nothing else is left to open.", load(), false);
       });
     }
@@ -254,7 +321,7 @@ import {
     btn("Clear collection", function () {
       cancelCountdown();
       if (confirm("Delete everything captured so far?")) {
-        localStorage.removeItem(STORE);
+        clearCollection();
         localStorage.removeItem(SKIP_STORE);
         overlay("Collection cleared.", load(), false);
       }
@@ -404,8 +471,7 @@ import {
       progress(t, c);
     };
     overlay("Getting everything for this race ...", c, true);
-    var item = workItem(competitionId);
-    if (racePages(c, competitionId, item, loadSkips().events).competitionPage) {
+    if (racePages(c, competitionId, loadSkips().events).competitionPage) {
       say("Opening the race's competition page ...");
       await inFrame(
         competitionPagePath(competitionId),
@@ -421,7 +487,7 @@ import {
     var names = {};
     for (var i = 0; i < c.competitionEvents.length; i++)
       if (c.competitionEvents[i].competitionId === competitionId) c.competitionEvents[i].events.forEach(function (x) { names[x.id] = x.name; });
-    var todo = racePages(c, competitionId, item, loadSkips().events).events.map(function (id) {
+    var todo = racePages(c, competitionId, loadSkips().events).events.map(function (id) {
       return { id: id, name: names[id] || "event " + id };
     });
     var got = 0;
@@ -454,7 +520,6 @@ import {
 
   async function run(force) {
     stopped = false;
-    takeWork();
     var c = load();
     var kind = pageKind(location.pathname);
     var say = function (t) {
@@ -496,10 +561,9 @@ import {
       overlay(
         (stopped ? "Stopped. " : "Done. ") + "Read " + pages + " page" + (pages === 1 ? "" : "s") + " of the list, " + listed + " competitions" +
           (filter ? " (" + filter + ")" : " (no Category filter found: women's races are told by their names)") +
-          ". NEXT: download the collection and open it in KinderkopjeDB, change the season or category and press again, or go through the races one by one below.",
+          ". NEXT: download the collection and open it in KinderkopjeDB, or change the season or category and press again.",
         c,
         false,
-        { next: !stopped },
       );
       return;
     }
@@ -558,7 +622,15 @@ import {
     overlay("This is not a DataRide results page. Open the competition list (dataride.uci.ch/iframe/Results/10/), a competition or an event first.", c, false);
   }
 
-  run().catch(function (e) {
-    overlay("Stopped by an error: " + (e && e.message ? e.message : e) + ". What was read so far is kept.", load(), false);
-  });
+  // the queue hand-off of earlier versions is gone; drop the work list it kept
+  try {
+    localStorage.removeItem("racethreads-capture-uci-work");
+  } catch (e) {}
+  openStore()
+    .then(function () {
+      return run();
+    })
+    .catch(function (e) {
+      overlay("Stopped by an error: " + (e && e.message ? e.message : e) + ". What was read so far is kept.", load(), false);
+    });
 })();

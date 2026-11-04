@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import { parseHTML } from "linkedom";
 import { describe, expect, it } from "vitest";
-import { addCapture, decodeWorkList, emptyCube } from "../src/core";
+import { addCapture, emptyCube } from "../src/core";
 import { initCollect } from "../src/web/pages/collect";
 import { forgetChoices } from "../src/web/dom";
 import { fakeWikidata } from "./helpers/wikidata";
@@ -471,31 +471,5 @@ describe("the race queue page", () => {
     expect(text()).toContain("Finished Classic");
     expect(text()).not.toContain("finished race hidden");
     expect(text()).toContain("1/1 events");
-  });
-});
-
-describe("the work list the queue hands to the capture bookmark", () => {
-  const work = (a: Element) => decodeWorkList(decodeURIComponent((a.getAttribute("href") ?? "").split("#kdb=")[1] ?? ""));
-  const press = (a: Element) => a.dispatchEvent(new (a.ownerDocument!.defaultView as unknown as typeof globalThis).Event("mousedown", { bubbles: true }));
-
-  it("goes with a race link when it is opened, and holds only the races the queue shows", () => {
-    const { doc } = page();
-    const link = doc.querySelector("#queueout table a[href*='CompetitionResults']")!;
-    expect(link.getAttribute("href")).not.toContain("#kdb=");
-    press(link);
-    expect(link.getAttribute("href")).toMatch(/^https:\/\/dataride\.uci\.ch\/iframe\/CompetitionResults\/2\?disciplineId=10#kdb=/);
-    expect(work(link).map((w) => w.c)).toEqual([2]);
-  });
-
-  it("lists the pages still to read for a race whose events are known, and none it already has", () => {
-    const { doc } = pageWith([["Stage Tour", 2026, "2.Pro"]], undefined, (cube) => {
-      addCapture(cube, { format: "racethreads-capture/1", competitionEvents: [{ competitionId: 1, events: [{ id: 11, name: "Stage 1: Stage Classification" }, { id: 12, name: "Stage 2: Stage Classification" }, { id: 13, name: "Final Classification: General Classification" }, { id: 14, name: "Stage 1: Stage General Classification" }] }] });
-      const rows = (n: number) => Array.from({ length: n }, (_, i) => ({ rank: i + 1, rider: "R" + i, team: "T", age: 25, nation: "BEL", result: "x", points: 5 }));
-      addCapture(cube, { format: "racethreads-capture/1", eventResults: [{ competitionId: 1, eventId: 11, heading: "x", totalRows: 40, rows: rows(5) }, { competitionId: 1, eventId: 12, heading: "x", totalRows: 40, rows: rows(40) }] });
-    });
-    const link = doc.querySelector("#queueout table a[href*='CompetitionResults']")!;
-    press(link);
-    // the next page of stage 2 first, then the general classification, then the leader page
-    expect(work(link)).toEqual([{ c: 1, name: "Stage Tour 2026", events: [12, 13, 14] }]);
   });
 });

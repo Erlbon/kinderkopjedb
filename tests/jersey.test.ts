@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { competitionPagePath, decodeWorkList, encodeWorkList, eventPagePath, jerseyKind, missingJerseyEvents, nextPageToOpen, racePages, workListFromHash } from "../src/core";
+import { competitionPagePath, eventPagePath, jerseyKind, missingJerseyEvents, nextPageToOpen, racePages } from "../src/core";
 
 describe("the jersey pages that pay points", () => {
   it("tells the leader pages and the final points and mountain pages from everything else", () => {
@@ -65,46 +65,22 @@ describe("the next page to open after a capture", () => {
   });
 
   const done = { ...collection, eventResults: [21, 22, 23].map((eventId) => ({ competitionId: 2, eventId })) };
-  const none = { competitions: [], events: [] };
 
-  it("without a work list from the queue it stays in this race: the bookmark's own list holds races of every class", () => {
+  it("never goes on to another race: the bookmark's own list holds races of every class", () => {
     expect(nextPageToOpen(done, 2)).toBeUndefined();
     expect(nextPageToOpen(collection, 2, { competitions: [], events: [21] })?.path).toBe(eventPagePath(2, 23));
+    expect(nextPageToOpen(collection, 2, { competitions: [2], events: [] })).toBeUndefined();
+    expect(nextPageToOpen(collection)).toBeUndefined();
   });
 
-  it("with a work list it goes on to the next race of the list after this one, and only to those", () => {
-    const work = [
-      { c: 4, name: "Paris-Tours 2026", events: [41, 42] },
-      { c: 2, name: "Tour of Guangxi 2026" },
-      { c: 7, name: "Il Lombardia 2026" },
-    ];
-    expect(nextPageToOpen(done, 2, none, work)).toEqual({ path: competitionPagePath(7), label: "Il Lombardia 2026" });
-    expect(nextPageToOpen(done, 2, { competitions: [7], events: [] }, work)).toEqual({ path: eventPagePath(4, 41), label: "Paris-Tours 2026: 2 pages still to capture" });
-    // a page the database or this browser already has is not opened again
-    const got41 = { ...done, eventResults: [...done.eventResults, { competitionId: 4, eventId: 41 }] };
-    expect(nextPageToOpen(got41, 2, { competitions: [7], events: [] }, work)?.path).toBe(eventPagePath(4, 42));
-    expect(nextPageToOpen(done, 2, { competitions: [4, 7], events: [] }, work)).toBeUndefined();
+  it("opens a race's competition page first when its events are not known", () => {
+    expect(nextPageToOpen(collection, 4)).toEqual({ path: competitionPagePath(4), label: "Paris-Tours" });
   });
 
-  it("finishes the race it came from first, also when that race is not in the work list", () => {
-    expect(nextPageToOpen(collection, 2, none, [{ c: 4, name: "Paris-Tours 2026", events: [41] }])?.path).toBe(eventPagePath(2, 23));
-  });
-
-  it("the pages of one race: the work list's when it has them, else this browser's event list, else its competition page", () => {
-    expect(racePages(collection, 4, { c: 4, name: "x", events: [41, 42] })).toEqual({ competitionPage: false, events: [41, 42] });
+  it("the pages of one race: this browser's event list, else its competition page", () => {
     expect(racePages(collection, 2)).toEqual({ competitionPage: false, events: [23, 21, 22] });
+    expect(racePages(collection, 2, [23])).toEqual({ competitionPage: false, events: [21, 22] });
     expect(racePages(collection, 9)).toEqual({ competitionPage: true, events: [] });
-  });
-
-  it("the work list survives the trip through a link", () => {
-    const work = [
-      { c: 4, name: "Paris~Tours, 2026 #1", events: [41, 42] },
-      { c: 7, name: "Il Lombardia 2026" },
-    ];
-    const text = encodeWorkList(work);
-    expect(decodeWorkList(text)).toEqual([{ c: 4, name: "Paris Tours  2026 #1", events: [41, 42] }, { c: 7, name: "Il Lombardia 2026" }]);
-    expect(workListFromHash("#kdb=" + encodeURIComponent(text))).toEqual(decodeWorkList(text));
-    expect(workListFromHash("")).toBeUndefined();
   });
 
   it("builds the address the competition list itself links to", () => {
