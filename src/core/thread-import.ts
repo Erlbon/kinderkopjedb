@@ -30,11 +30,20 @@ const LABELS: Record<string, string> = {
   social: "social",
   "live tracker": "tracker",
   "live trackers": "tracker",
+  livetracker: "tracker",
+  livetrackers: "tracker",
   trackers: "tracker",
+  "live ticker": "tracker",
+  "live tickers": "tracker",
+  liveticker: "tracker",
+  livetickers: "tracker",
   "where to watch": "watch",
   tv: "watch",
   streams: "watch",
+  "tv & streams": "watch",
+  "tv and streams": "watch",
   coverage: "coverage",
+  "live coverage": "coverage",
   "/r/peloton content": "content",
   "r/peloton content": "content",
 };
@@ -112,8 +121,9 @@ export function parseOldThread(markdown: string): ParsedThread {
     // "|label|content|", with or without outer pipes; skip header and alignment rows
     const parts = l.replace(/^\|/, "").replace(/\|$/, "").split("|");
     if (parts.length < 2) continue;
-    const label = cleanText(parts[0]!);
-    if (!label || /^[:\-\s_]+$/.test(label)) continue;
+    // "Information:" in some threads; "Outlet type | Links" is a header row (Paris-Nice 2024)
+    const label = cleanText(parts[0]!).replace(/\s*:$/, "");
+    if (!label || /^[:\-\s_]+$/.test(label) || /^outlet type$/i.test(label)) continue;
     // The first wide row is the header of the route/stage table.
     if (result.tableHeader.length === 0 && parts.length >= 4) {
       result.tableHeader = parts.map((c) => cleanText(c));
@@ -128,7 +138,11 @@ export function parseOldThread(markdown: string): ParsedThread {
       continue;
     }
     const cell = parts.slice(1).join("|").trim();
-    if (cell) result.rows[key] = parseCell(cell);
+    if (!cell) continue;
+    // two rows that mean the same ("Live ticker" and "Live Trackers") add up instead of replacing each other
+    const v = parseCell(cell);
+    const had = result.rows[key];
+    result.rows[key] = Array.isArray(had) && Array.isArray(v) ? [...had, ...v] : v;
   }
   return result;
 }
