@@ -83,12 +83,11 @@ function toFound(p: Post): FoundPost {
   return { id: p.id, title: p.title, createdAt: p.createdAt.toISOString(), permalink: p.permalink, author: p.authorName, body: p.body };
 }
 
-/** Posts by id, for the threads the second pass found without their text (at most 50 per call). */
+/** Posts by id, for the threads the second pass found without their text (at most 10 per call, fetched together). */
 async function routePosts(req: PostsReq): Promise<PostsRsp | ErrorRsp> {
-  const ids = (req.ids ?? []).filter((id) => /^t3_[a-z0-9]+$/i.test(id)).slice(0, 50);
-  const posts: FoundPost[] = [];
-  for (const id of ids) posts.push(toFound(await reddit.getPostById(id as `t3_${string}`)));
-  return { posts };
+  const ids = (req.ids ?? []).filter((id) => /^t3_[a-z0-9]+$/i.test(id)).slice(0, 10);
+  const got = await Promise.allSettled(ids.map((id) => reddit.getPostById(id as `t3_${string}`)));
+  return { posts: got.flatMap((g) => (g.status === "fulfilled" ? [toFound(g.value)] : [])) };
 }
 
 async function routeMenuNewPost(): Promise<UiResponse> {

@@ -12,10 +12,31 @@ const subEl = $<HTMLInputElement>("sub");
 let editions: EditionEntry[] = [];
 const results: SearchRsp[] = [];
 
+const TIME_LIMIT_MS = 45_000; // a request that has not answered by then is given up (a run once hung on one)
+
+async function getJsonOnce<T>(url: string, init?: RequestInit): Promise<T> {
+  const ctl = new AbortController();
+  const timer = setTimeout(() => ctl.abort(), TIME_LIMIT_MS);
+  try {
+    const rsp = await fetch(url, { ...init, signal: ctl.signal, headers: { Accept: "application/json", "Content-Type": "application/json" } });
+    if (!rsp.ok) throw new Error(`HTTP ${rsp.status}: ${(await rsp.text().catch(() => "")).slice(0, 300)}`);
+    return (await rsp.json()) as T;
+  } catch (err) {
+    if (ctl.signal.aborted) throw new Error("no answer in " + TIME_LIMIT_MS / 1000 + " s");
+    throw err;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+/** One retry after a short pause: Reddit sometimes refuses a burst of searches. */
 async function getJson<T>(url: string, init?: RequestInit): Promise<T> {
-  const rsp = await fetch(url, { ...init, headers: { Accept: "application/json", "Content-Type": "application/json" } });
-  if (!rsp.ok) throw new Error(`HTTP ${rsp.status}: ${(await rsp.text().catch(() => "")).slice(0, 300)}`);
-  return (await rsp.json()) as T;
+  try {
+    return await getJsonOnce<T>(url, init);
+  } catch {
+    await new Promise((r) => setTimeout(r, 3000));
+    return getJsonOnce<T>(url, init);
+  }
 }
 
 function el(tag: string, text = "", cls = ""): HTMLElement {
@@ -130,9 +151,9 @@ async function secondPass(): Promise<void> {
     statusEl.textContent = "Second pass: " + label(r.edition);
     // the posts that came from another search as a title only: fetch their text
     const need = m.threads.filter((t) => t.post.body === undefined).map((t) => t.post.id);
-    for (let i = 0; i < need.length; i += 50) {
+    for (let i = 0; i < need.length; i += 10) {
       try {
-        const req: PostsReq = { ids: need.slice(i, i + 50) };
+        const req: PostsReq = { ids: need.slice(i, i + 10) };
         const got = await getJson<PostsRsp>(Endpoint.Posts, { method: "POST", body: JSON.stringify(req) });
         for (const p of got.posts) {
           const t = m.threads.find((x) => x.post.id === p.id);
