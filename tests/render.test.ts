@@ -307,6 +307,33 @@ describe("learning from old threads", () => {
   });
 });
 
+describe("coverage start", () => {
+  const s = parseSeason(
+    [
+      "season: 2026",
+      "races:",
+      "  - race: tour-de-france-me",
+      "    class: 2.UWT",
+      "    coverage: '12:00'",
+      "    info: { watch: [{ text: Eurosport, url: 'https://www.eurosport.com/' }] }",
+      "    stages:",
+      "      - { n: 5, date: 2026-07-08 }",
+      "      - { n: 6, date: 2026-07-09, coverage: '11:15' }",
+    ].join(String.fromCharCode(10)),
+    registry,
+  );
+  const ts = renderSeason(profile, registry, s);
+  const row = (n: number) => ts.find((t) => t.id === "tour-de-france-me-stage-" + n)!.body.split(String.fromCharCode(10)).find((l) => l.startsWith("|Where to watch|"));
+  it("goes at the end of the TV row, with the zone linked", () => {
+    expect(row(5)).toBe(
+      "|Where to watch|[Eurosport](https://www.eurosport.com/) / Race coverage starts at 12:00 [CEST](https://www.timeanddate.com/worldclock/fixedtime.html?iso=20260708T1000&p1=1440)|",
+    );
+  });
+  it("a stage's own time beats the race's", () => {
+    expect(row(6)).toContain("starts at 11:15 [CEST](https://www.timeanddate.com/worldclock/fixedtime.html?iso=20260709T0915&p1=1440)");
+  });
+});
+
 describe("team presentation thread", () => {
   const s = parseSeason(
     [

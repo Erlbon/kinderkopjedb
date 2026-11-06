@@ -46,6 +46,7 @@ export interface Leg {
   finishUrl?: string; // image of the finish; links the Finish cell
   start?: string; // "11:45"
   end?: string; // "16:43"
+  coverage?: string; // "12:00": when the TV coverage starts (written into the profile's coverage row)
   info?: Record<string, InfoValue>; // adds to / replaces standard info rows
   extra?: ExtraRow[]; // additional rows after the standard ones
   notes?: string; // free markdown appended below the tables
@@ -142,6 +143,8 @@ export interface Profile {
   restIntro: string; // placeholder where the moderator writes the recap
   restFooter: string; // standard closing block (wiki, FAQ, dictionary links)
   megaIntro: string;
+  /** Where and how the coverage start is written: the info row (default "coverage") and a text with {time}. */
+  coverage?: { row?: string; text: string };
   /** Team presentation thread: {time} = start with zone, {stream} = the stream link line (empty without one). */
   presentationIntro?: string;
   defaultIntro: string;

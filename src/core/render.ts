@@ -186,6 +186,22 @@ function autoItems(row: InfoRowDef, ctx: Ctx): InfoLink[] {
   return out;
 }
 
+/**
+ * "Race coverage starts at 12:00 CEST" for the row the profile puts it in (Coverage by default,
+ * TV in the Grand Tour threads). The stage's own time wins over the race's.
+ */
+function coverageText(rowId: string, leg: Leg, ctx: Ctx): string | undefined {
+  const c = ctx.profile.coverage;
+  if (rowId !== (c?.row ?? "coverage")) return undefined;
+  const time = leg.coverage ?? ctx.race.coverage;
+  const date = leg.date ?? ctx.race.date ?? ctx.race.stages?.[0]?.date;
+  if (!time || !date) return undefined;
+  const zone = zoneFor(date, ctx.race.tz ?? ctx.reg?.tz ?? "CET");
+  const url = converterUrl(date, time, zone);
+  const t = time + " " + (url ? "[" + zone + "](" + url + ")" : zone);
+  return (c?.text ?? "Coverage starts at {time}").split("{time}").join(t);
+}
+
 function infoTable(kind: "oneday" | "stage", leg: Leg, ctx: Ctx): string {
   const lines = ["|||", "|-|-|"];
   for (const row of ctx.profile.infoRows) {
@@ -203,7 +219,9 @@ function infoTable(kind: "oneday" | "stage", leg: Leg, ctx: Ctx): string {
       if (Array.isArray(v)) links.push(...v);
       else md = v.md;
     }
-    const text = md ?? links.map(mdLink).join(" / ");
+    let text = md ?? links.map(mdLink).join(" / ");
+    const cov = coverageText(row.id, leg, ctx);
+    if (cov) text = text ? text + " / " + cov : cov;
     // Moderators name rows differently ("Overall Previews"); a race can carry its own label.
     const label = ctx.race.labels?.[row.id] ?? ctx.reg?.labels?.[row.id] ?? row.label;
     if (!text) {
@@ -325,6 +343,7 @@ export function renderRace(
       finishUrl: race.finishUrl,
       start: race.start,
       end: race.end,
+      coverage: race.coverage,
     };
     const title = fill(profile.titles.oneday, vars(ctx));
     const body =
