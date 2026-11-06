@@ -1,5 +1,6 @@
 import { RaceClass, classWarnings } from "./classes";
 import { addDays, ddmm, yearOf } from "./dates";
+import { converterUrl, zoneFor } from "./timezone";
 import {
   Column,
   InfoLink,
@@ -137,9 +138,10 @@ function cell(col: Column, leg: Leg & { n?: number }, ctx: Ctx, what: string): s
       return leg.finishUrl ? "[" + leg.finish + "](" + leg.finishUrl + ")" : leg.finish;
     case "time": {
       if (!leg.start) return miss("time");
-      const tz = ctx.race.tz ?? ctx.reg?.tz ?? "CET";
+      const zone = zoneFor(leg.date, ctx.race.tz ?? ctx.reg?.tz ?? "CET");
       const sep = col.format ?? " – ";
-      return (leg.end ? leg.start + sep + leg.end : leg.start) + " " + tz;
+      const url = col.link ? converterUrl(leg.date, leg.start, zone) : undefined;
+      return (leg.end ? leg.start + sep + leg.end : leg.start) + " " + (url ? "[" + zone + "](" + url + ")" : zone);
     }
   }
 }

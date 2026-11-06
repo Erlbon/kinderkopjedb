@@ -26,7 +26,7 @@ tables:
     - { header: Altitude, field: altitude, optional: true }
     - { header: Type, field: type }
     - { header: Finish, field: finish }
-    - { header: Time, field: time, format: " – " }
+    - { header: Time, field: time, format: " – ", link: true }
   # Moderators lay tables out differently. A variant replaces the one-day and/or
   # stage table; pick the default on the page, or per race with `table:` in the registry/season.
   variants:
@@ -38,7 +38,7 @@ tables:
         - { header: Length, field: length }
         - { header: Profile, field: type }
         - { header: Finish, field: finish }
-        - { header: Time, field: time, format: " - " }
+        - { header: Time, field: time, format: " - ", link: true }
     stage-first:
       label: Stage first (as in the 2026 Vuelta threads)
       stage:
@@ -49,7 +49,7 @@ tables:
         - { header: Type, field: type, align: r }
         - { header: Altitude, field: altitude, align: r }
         - { header: Finish, field: finish }
-        - { header: Time, field: time, format: "-" }
+        - { header: Time, field: time, format: "-", link: true }
   stage:
     - { header: Date, field: date, format: "ddd. dd/mm", align: r }
     - { header: Stage, field: stage }
@@ -58,7 +58,7 @@ tables:
     - { header: Type, field: type, align: r }
     - { header: Altitude, field: altitude, align: r }
     - { header: Finish, field: finish }
-    - { header: Time, field: time, format: "-" }
+    - { header: Time, field: time, format: "-", link: true }
 
 infoRows:
   - { id: information, label: Information, auto: [official, startlistFc, wikipedia] }

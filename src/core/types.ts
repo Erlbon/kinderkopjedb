@@ -28,7 +28,7 @@ export interface RegistryRace {
   social?: InfoLink[];
   /** Info-row items that carry over every year, per row id (information, previews, ...). */
   info?: Record<string, InfoValue>;
-  tz?: string; // default time zone label, e.g. CET
+  tz?: string; // time zone label, e.g. CET (CET/CEST, WET/WEST, EET/EEST follow the date by themselves)
 }
 
 /** One racing day: a one-day race or one stage. */
@@ -106,6 +106,8 @@ export interface Column {
   format?: string;
   /** Leave the whole column out when no row has a value (used for Altitude on one-day races). */
   optional?: boolean;
+  /** time: link the zone name to a page showing the start in the reader's own time zone. */
+  link?: boolean;
 }
 
 /** Info-row items built from the race registry / season data when present. */

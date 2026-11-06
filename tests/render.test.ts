@@ -32,7 +32,7 @@ describe("one-day race (Strade Bianche 2026 men)", () => {
   it("route table", () => {
     expect(t.body).toContain("|Date|From > To|Length|Type|Finish|Time|");
     expect(t.body).toContain(
-      "|07.03|[Siena > Siena](https://www.strade-bianche.it/en/men-route/)|203km|punchy|uphill|11:45 – 16:43 CET|",
+      "|07.03|[Siena > Siena](https://www.strade-bianche.it/en/men-route/)|203km|punchy|uphill|11:45 – 16:43 [CET](https://www.timeanddate.com/worldclock/fixedtime.html?iso=20260307T1045&p1=1440)|",
     );
   });
   it("info rows: auto items first, then season items", () => {
@@ -57,7 +57,8 @@ describe("stage race (Tour de France 2026)", () => {
     expect(t.body).toContain("|Date|Stage|Route|Length|Type|Altitude|Finish|Time|");
     expect(t.body).toContain("|---:|---|---|---:|---:|---:|---|---|");
     expect(t.body).toContain(
-      "|Thu. 09/07|[6](https://www.letour.fr/en/stage-6)|[Pau > Gavarnie-Gèdre](https://tourview.pages.dev/tdf2026/stage-6)|186km|Hard|3978m|Uphill|12:25-17:46 CET|",
+      // July: the registry's CET becomes CEST by itself
+      "|Thu. 09/07|[6](https://www.letour.fr/en/stage-6)|[Pau > Gavarnie-Gèdre](https://tourview.pages.dev/tdf2026/stage-6)|186km|Hard|3978m|Uphill|12:25-17:46 [CEST](https://www.timeanddate.com/worldclock/fixedtime.html?iso=20260709T1025&p1=1440)|",
     );
   });
   it("race-level and stage-level info merge", () => {
@@ -435,10 +436,10 @@ describe("stage table import (the hand-built Grand Tour table)", () => {
     expect(ts.filter((t) => t.kind === "rest")).toHaveLength(2);
     const s6 = ts.find((t) => t.id === "tour-de-france-me-stage-6")!;
     expect(s6.body).toContain(
-      "|Thu. 09/07|[6](https://www.letour.fr/en/stage-6)|[Pau > Gavarnie-Gèdre](https://i.imgur.com/0uWgEFb.jpeg)|186km|[Hard](https://i.imgur.com/z4xgbd7.jpeg)|3978m|[Uphill](https://i.imgur.com/U7E8aaG.jpeg)|12:25-17:46 CET|",
+      "|Thu. 09/07|[6](https://www.letour.fr/en/stage-6)|[Pau > Gavarnie-Gèdre](https://i.imgur.com/0uWgEFb.jpeg)|186km|[Hard](https://i.imgur.com/z4xgbd7.jpeg)|3978m|[Uphill](https://i.imgur.com/U7E8aaG.jpeg)|12:25-17:46 [CEST](https://www.timeanddate.com/worldclock/fixedtime.html?iso=20260709T1025&p1=1440)|",
     );
     const s1 = ts.find((t) => t.id === "tour-de-france-me-stage-1")!;
-    expect(s1.body).toContain("|19km|[TTT](https://i.imgur.com/qW5xMfO.jpeg)|231m|-|17:05-19:15 CET|");
+    expect(s1.body).toContain("|19km|[TTT](https://i.imgur.com/qW5xMfO.jpeg)|231m|-|17:05-19:15 [CEST](https://www.timeanddate.com/worldclock/fixedtime.html?iso=20260704T1505&p1=1440)|");
   });
 });
 
