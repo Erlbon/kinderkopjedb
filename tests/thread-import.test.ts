@@ -7,6 +7,40 @@ const NL = String.fromCharCode(10);
 const read = (p: string) => readFileSync(new URL("../" + p, import.meta.url), "utf8");
 const profile = parseProfile(read("data/profiles/peloton.yaml"));
 
+describe("the extended monument layout (Paris-Roubaix 2024-2026, Liège 2024)", () => {
+  const md = [
+    "[Race Thread] 2026 Paris-Roubaix (1.UWT)",
+    "|Date|From > To|Length|Profile|Finish|Time|",
+    "|:-|:-|:-|:-|:-|:-|",
+    "|April 12, 2026|Compiegne > Roubaix|258.3km|Cobbles|Velodrome|11:05 - 16:35 CEST|",
+    "",
+    "|||",
+    "--- | ---",
+    "|**Information**|[Official Site](https://www.paris-roubaix.fr/en)",
+    "|Startlist| [Men's Startlist](https://firstcycling.com/race.php?r=8&y=2026&k=8)",
+    "Weather | [Sunday: Cloudy](https://www.bbc.com/weather/2982681)|",
+    "|Interactive Map|[San Luca](https://sanluca.cc/races/x)|",
+    "|Men's Articles|[INRNG](https://inrng.com/2026/04/paris-roubaix-2026-preview/)|",
+    "|Background|[A Beginners Guide](https://www.globalcyclingnetwork.com/x)|",
+    "|Men's Live Trackers|[Official](https://racecenter.paris-roubaix.fr/en/)",
+    "|Timeline of sectors|[Cycling news](https://www.cyclingnews.com/x)",
+    "|Where to Watch|[List](https://www.paris-roubaix.fr/en/broadcasters)",
+    "|Selected Streaming Links| [Eurosport](https://www.eurosport.com/)",
+  ].join(NL);
+
+  it("reads every row into the profile's rows", () => {
+    const p = parseOldThread(md);
+    expect(p.unknownLabels).toEqual([]);
+    expect(Object.keys(p.rows).sort()).toEqual(["background", "information", "map", "previews", "sectors", "startlist", "streams", "tracker", "watch", "weather"]);
+  });
+
+  it("the profile has a row for each, left out of a thread when empty", () => {
+    for (const id of ["startlist", "weather", "map", "background", "sectors", "streams"]) {
+      expect(profile.infoRows.find((r) => r.id === id), id).toMatchObject({ optional: true });
+    }
+  });
+});
+
 describe("table layouts", () => {
   it("knows the Profile column of one-day races (Strade 2024 women)", () => {
     const p = parseOldThread(read("tests/fixtures/old-strade-2024-we.md"));

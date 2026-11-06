@@ -61,15 +61,23 @@ tables:
     - { header: Finish, field: finish }
     - { header: Time, field: time, format: "-", link: true }
 
+# The optional rows (startlist ... streams) are the extended monument layout of 2024-2026
+# (Paris-Roubaix, Milano-Sanremo, Liège): they show only when filled in.
 infoRows:
   - { id: information, label: Information, auto: [official, startlistFc, wikipedia] }
+  - { id: startlist, label: Startlist, optional: true }
   - { id: previews, label: Previews }
+  - { id: background, label: Background, optional: true }
   - { id: stagepreviews, label: Stage Previews, optional: true, kinds: [stage] }
   - { id: content, label: "/r/Peloton Content", optional: true }
   - { id: social, label: Social Media, auto: [social] }
+  - { id: weather, label: Weather, optional: true }
+  - { id: map, label: Interactive Map, optional: true }
   - { id: tracker, label: Live Trackers, auto: [pcsLive] }
+  - { id: sectors, label: Timeline of sectors, optional: true }
   - { id: coverage, label: Coverage, optional: true }
   - { id: watch, label: Where to watch }
+  - { id: streams, label: Selected Streaming Links, optional: true }
 
 # The coverage start (`coverage: "12:00"` on a race or stage) goes at the end of this row,
 # with the zone linked to a converter. The Grand Tour threads write it in the TV row.

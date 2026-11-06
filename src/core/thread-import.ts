@@ -45,6 +45,35 @@ const LABELS: Record<string, string> = {
   "tv and streams": "watch",
   coverage: "coverage",
   "live coverage": "coverage",
+  // the extended monument layout (2024-2026)
+  startlist: "startlist",
+  "start list": "startlist",
+  startlists: "startlist",
+  weather: "weather",
+  "weather forecast": "weather",
+  "interactive map": "map",
+  map: "map",
+  background: "background",
+  articles: "previews",
+  "men's articles": "previews",
+  "women's articles": "previews",
+  "men's live trackers": "tracker",
+  "women's live trackers": "tracker",
+  tracker: "tracker",
+  "timeline of sectors": "sectors",
+  "selected streaming links": "streams",
+  "streaming links": "streams",
+  broadcast: "watch",
+  // more spellings found in the 900 WorldTour threads of 2021-2026
+  "live tracking": "tracker",
+  "live updates": "tracker",
+  live: "tracker",
+  "main info": "information",
+  "broadcast start": "coverage",
+  sanluca: "map",
+  games: "content",
+  fantasy: "content",
+  "r/peloton fantasy games": "content",
   "/r/peloton content": "content",
   "r/peloton content": "content",
 };
@@ -130,8 +159,8 @@ export function parseOldThread(markdown: string): ParsedThread {
     const parts = l.replace(/^\|/, "").replace(/\|$/, "").split("|");
     if (parts.length < 2) continue;
     // "Information:" in some threads; "Outlet type | Links" is a header row (Paris-Nice 2024)
-    const label = cleanText(parts[0]!).replace(/\s*:$/, "");
-    if (!label || /^[:\-\s_]+$/.test(label) || /^outlet type$/i.test(label)) continue;
+    const label = cleanText(parts[0]!.replace(/\*+/g, "")).replace(/\s*:$/, ""); // "**Information**" (Roubaix 2024) too
+    if (!label || /^[:\-\s_]+$/.test(label) || /^(outlet|source) type$/i.test(label)) continue;
     // The first wide row is the header of the route/stage table.
     if (result.tableHeader.length === 0 && parts.length >= 4) {
       result.tableHeader = parts.map((c) => cleanText(c));
