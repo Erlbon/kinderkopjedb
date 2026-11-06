@@ -1,6 +1,31 @@
 # How r/peloton titles name a race when it differs from the UCI name in the database.
 # Key = the race key in the database (race.key). The thread finder searches these names
 # first, then the database's own names. Add a race here when the finder misses its threads.
+# A title name that is part of a longer name here (or the other way round) matches too, so
+# "Paris-Roubaix" finds "Paris-Roubaix Hauts-de-France"; the search itself needs the short name.
 
 rondevanvlaanderen|ME: [Tour of Flanders]
 vueltaciclistaaespana|ME: [Vuelta a España, La Vuelta]
+parisroubaix|ME: [Paris-Roubaix]
+milanosanremo|ME: [Milano-Sanremo, Milan-San Remo, Milan-Sanremo]
+omloopnieuwsblad|ME: [Omloop Het Nieuwsblad, Omloop Nieuwsblad]
+inflandersfieldsfrommiddelkerketowevelgem|ME: [Gent-Wevelgem]
+dwarsdoorvlaanderenatraversflandre|ME: [Dwars door Vlaanderen]
+classicbruggepanne|ME: [Classic Brugge-De Panne, Brugge-De Panne]
+rondevanbruggetourofbruges|ME: [Ronde van Brugge, Classic Brugge-De Panne]
+e3saxoclassic|ME: [E3 Saxo Classic, E3 Harelbeke]
+bretagneclassiccic|ME: [Bretagne Classic, GP Plouay]
+adaccyclassics|ME: [Hamburg Cyclassics, Cyclassics Hamburg, Cyclassics]
+bemercyclassics|ME: [Hamburg Cyclassics, Cyclassics Hamburg, Cyclassics]
+dsskdonostiasansebastianklasikoa|ME: [Clasica San Sebastian, San Sebastian, Donostia San Sebastian Klasikoa]
+grandprixcyclistemontreal|ME: [GP Montréal, Grand Prix Cycliste de Montréal]
+grandprixcyclistequebec|ME: [GP Québec, Grand Prix Cycliste de Québec]
+tourauvergnerhonealpes|ME: [Critérium du Dauphiné, Dauphiné, Tour Auvergne-Rhône-Alpes]
+itzuliabasquecountry|ME: [Itzulia Basque Country, Tour of the Basque Country, Itzulia]
+voltaciclistaacatalunya|ME: [Volta a Catalunya, Volta Ciclista a Catalunya]
+cadelevansgreatoceanroadrace|ME: [Cadel Evans Great Ocean Road Race]
+tourdownunder|ME: [Tour Down Under]
+beneluxtour|ME: [Benelux Tour, Renewi Tour, BinckBank Tour]
+renewitour|ME: [Renewi Tour, Benelux Tour]
+lombardia|ME: [Il Lombardia, Giro di Lombardia]
+flechewallonne|ME: [La Flèche Wallonne, Fleche Wallonne]

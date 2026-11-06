@@ -4,6 +4,7 @@
 //   node scripts/thread-editions.mjs                       (the test set)
 //   node scripts/thread-editions.mjs --races tourfrance,parisnice --years 2023-2025
 //   node scripts/thread-editions.mjs --all
+//   node scripts/thread-editions.mjs --class UWT --years 2021-2026    (every WorldTour race)
 import { readFileSync, writeFileSync } from "node:fs";
 import { parse } from "yaml";
 import initSqlJs from "sql.js";
@@ -19,7 +20,8 @@ function arg(name) {
 }
 
 const all = process.argv.includes("--all");
-const races = all ? undefined : (arg("races")?.split(",").map((k) => (k.includes("|") ? k : k + "|ME")) ?? TEST_RACES);
+const klass = arg("class"); // "UWT" matches 1.UWT and 2.UWT
+const races = all || klass ? undefined : (arg("races")?.split(",").map((k) => (k.includes("|") ? k : k + "|ME")) ?? TEST_RACES);
 const [y1, y2] = (arg("years") ?? (all ? "2000-2100" : "2023-2025")).split("-").map(Number);
 
 const SQL = await initSqlJs();
@@ -44,6 +46,7 @@ for (const r of rows(
   [y1, y2 ?? y1],
 )) {
   if (races && !races.includes(r.key)) continue;
+  if (klass && !String(r.class ?? "").endsWith(klass)) continue;
   const uciNames = rows("select distinct name from race_name where race_id = (select race_id from race where key = ?)", [r.key]).map((n) => n.name);
   const aliases = [...new Set([...(redditNames[r.key] ?? []), ...uciNames])].filter((n) => n !== r.name);
   const stages = new Map();
