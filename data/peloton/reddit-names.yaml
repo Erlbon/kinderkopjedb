@@ -1,0 +1,6 @@
+# How r/peloton titles name a race when it differs from the UCI name in the database.
+# Key = the race key in the database (race.key). The thread finder searches these names
+# first, then the database's own names. Add a race here when the finder misses its threads.
+
+rondevanvlaanderen|ME: [Tour of Flanders]
+vueltaciclistaaespana|ME: [Vuelta a España, La Vuelta]

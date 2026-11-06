@@ -1,0 +1,29 @@
+{
+  "$schema": "https://developers.reddit.com/schema/config-file.v1.json",
+  "name": "kdb-threads",
+  "post": {
+    "entrypoints": {
+      "default": {
+        "entry": "finder.html"
+      }
+    }
+  },
+  "server": {},
+  "permissions": {
+    "reddit": true
+  },
+  "menu": {
+    "items": [
+      {
+        "label": "[KinderkopjeDB] Thread finder",
+        "description": "Post a thread finder: searches for old race threads by the race dates.",
+        "location": "subreddit",
+        "forUserType": "moderator",
+        "endpoint": "/internal/on/menu/new-post"
+      }
+    ]
+  },
+  "scripts": {
+    "dev": "npm run watch"
+  }
+}

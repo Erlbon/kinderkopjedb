@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Thread finder</title>
+    <link rel="modulepreload" href="finder.js">
+    <style>
+    :root { color-scheme: light dark; font: 14px/1.4 system-ui, sans-serif; }
+    body { margin: 0; padding: 12px; }
+    header { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-bottom: 8px; }
+    h1 { font-size: 16px; margin: 0 8px 0 0; }
+    input { width: 9em; }
+    table { border-collapse: collapse; width: 100%; }
+    th, td { text-align: left; padding: 3px 6px; border-bottom: 1px solid #8884; vertical-align: top; }
+    td.n { text-align: right; white-space: nowrap; }
+    .miss { color: #c33; }
+    .ok { color: #2a7; }
+    details { margin: 2px 0; }
+    textarea { width: 100%; height: 8em; margin-top: 8px; font: 12px monospace; }
+    #status { opacity: 0.8; }
+    </style>
+  </head>
+  <body>
+    <header>
+      <h1>Thread finder</h1>
+      <label>r/<input id="sub" value="peloton"></label>
+      <button id="run" type="button">Search all</button>
+      <button id="copy" type="button" disabled>Copy results</button>
+      <span id="status">Loading editions…</span>
+    </header>
+    <table>
+      <thead><tr><th>Edition</th><th>Found</th><th>Missing</th><th>Searches</th></tr></thead>
+      <tbody id="rows"></tbody>
+    </table>
+    <textarea id="out" readonly placeholder="Results as JSON appear here after a search."></textarea>
+    <script src="finder.js" type="module"></script>
+  </body>
+</html>

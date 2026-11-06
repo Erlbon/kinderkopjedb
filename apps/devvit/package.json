@@ -1,0 +1,26 @@
+{
+  "private": true,
+  "name": "kdb-threads",
+  "version": "0.0.1",
+  "license": "MIT",
+  "type": "module",
+  "description": "KinderkopjeDB on Reddit: finds a subreddit's old race threads by the race dates in the database.",
+  "scripts": {
+    "build": "node build.mjs",
+    "editions": "cd ../.. && node scripts/thread-editions.mjs",
+    "login": "devvit login",
+    "playtest": "devvit playtest",
+    "typecheck": "tsc --noEmit",
+    "watch": "node build.mjs --watch"
+  },
+  "devDependencies": {
+    "@devvit/web": "0.15.2",
+    "@types/node": "24.19.2",
+    "devvit": "0.15.2",
+    "esbuild": "0.28.2",
+    "typescript": "7.0.2"
+  },
+  "engines": {
+    "node": ">=24.0.0"
+  }
+}
