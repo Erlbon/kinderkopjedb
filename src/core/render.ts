@@ -1,6 +1,7 @@
 import { RaceClass, classWarnings } from "./classes";
 import { addDays, ddmm, yearOf } from "./dates";
 import { lintThread } from "./lint";
+import { PatternVars, expandPattern } from "./patterns";
 import { converterUrl, zoneFor } from "./timezone";
 import {
   Column,
@@ -98,6 +99,10 @@ function mdLink(l: InfoLink): string {
   return l.url ? "[" + l.text + "](" + l.url + ")" : l.text;
 }
 
+function link(text: string, url: string | undefined): string {
+  return url ? "[" + text + "](" + url + ")" : text;
+}
+
 function cell(col: Column, leg: Leg & { n?: number }, ctx: Ctx, what: string): string {
   const miss = (field: string): string => {
     ctx.warnings.push(what + ": " + field + " missing");
@@ -108,11 +113,10 @@ function cell(col: Column, leg: Leg & { n?: number }, ctx: Ctx, what: string): s
       return fmtDate(leg.date, col.format ?? "dd.mm");
     case "stage":
       if (leg.n === undefined) return miss("stage number");
-      return leg.stageUrl ? "[" + leg.n + "](" + leg.stageUrl + ")" : String(leg.n);
+      return link(String(leg.n), cellUrl(leg.stageUrl, "stage", leg, ctx));
     case "route": {
       if (!leg.from || !leg.to) return miss("route (from > to)");
-      const t = leg.from + " > " + leg.to;
-      return leg.routeUrl ? "[" + t + "](" + leg.routeUrl + ")" : t;
+      return link(leg.from + " > " + leg.to, cellUrl(leg.routeUrl, "route", leg, ctx));
     }
     case "length":
       return leg.length === undefined ? miss("length") : fmtNumber(leg.length, col.format ?? "{n}km");
@@ -132,11 +136,11 @@ function cell(col: Column, leg: Leg & { n?: number }, ctx: Ctx, what: string): s
       if (leg.type && byRule && vocab.includes(leg.type) && leg.type !== byRule) {
         ctx.warnings.push(what + ": type " + leg.type + " but " + leg.altitude + " m is " + byRule + " by the altitude rule");
       }
-      return leg.typeUrl ? "[" + type + "](" + leg.typeUrl + ")" : type;
+      return link(type, cellUrl(leg.typeUrl, "type", leg, ctx));
     }
     case "finish":
       if (!leg.finish) return miss("finish");
-      return leg.finishUrl ? "[" + leg.finish + "](" + leg.finishUrl + ")" : leg.finish;
+      return link(leg.finish, cellUrl(leg.finishUrl, "finish", leg, ctx));
     case "time": {
       if (!leg.start) return miss("time");
       const zone = zoneFor(leg.date, ctx.race.tz ?? ctx.reg?.tz ?? "CET");
@@ -186,6 +190,28 @@ function autoItems(row: InfoRowDef, ctx: Ctx): InfoLink[] {
   return out;
 }
 
+function patternVars(leg: Leg & { n?: number }, ctx: Ctx): PatternVars {
+  return { year: ctx.year, date: leg.date ?? ctx.race.date ?? ctx.race.stages?.[0]?.date, stage: leg.n };
+}
+
+/** The registry's link patterns for one info row, filled in for this thread. */
+function patternLinks(rowId: string, leg: Leg & { n?: number }, ctx: Ctx): InfoLink[] {
+  const out: InfoLink[] = [];
+  for (const l of ctx.reg?.links ?? []) {
+    if (l.row !== rowId) continue;
+    const url = expandPattern(l.url, patternVars(leg, ctx));
+    if (url) out.push({ text: l.text, url });
+  }
+  return out;
+}
+
+/** A stage-table cell's address: the leg's own, else the registry's pattern. */
+function cellUrl(own: string | undefined, which: "stage" | "route" | "type" | "finish", leg: Leg & { n?: number }, ctx: Ctx): string | undefined {
+  if (own) return own;
+  const p = ctx.reg?.cells?.[which];
+  return p ? expandPattern(p, patternVars(leg, ctx)) : undefined;
+}
+
 /**
  * "Race coverage starts at 12:00 CEST" for the row the profile puts it in (Coverage by default,
  * TV in the Grand Tour threads). The stage's own time wins over the race's.
@@ -213,7 +239,7 @@ function infoTable(kind: "oneday" | "stage", leg: Leg, ctx: Ctx): string {
       leg.info?.[row.id],
     ];
     let md: string | undefined;
-    const links: InfoLink[] = autoItems(row, ctx);
+    const links: InfoLink[] = [...autoItems(row, ctx), ...patternLinks(row.id, leg, ctx)];
     for (const v of layers) {
       if (!v) continue;
       if (Array.isArray(v)) links.push(...v);

@@ -34,6 +34,13 @@ tour-de-france-me:
   officialSite: https://www.letour.fr/en/
   wikipedia: https://en.wikipedia.org/wiki/Tour_de_France
   firstcycling: 17
+  # Patterns seen in every Tour thread 2023-2025 (thread analysis 2026-11-06)
+  # (FirstCycling's profile images, {year}_17_{stage}.png, changed name in 2024: not used as a pattern)
+  cells:
+    stage: https://www.letour.fr/en/stage-{stage}
+  links:
+    - { row: tracker, text: Official, url: "https://racecenter.letour.fr/en/" }
+    - { row: tracker, text: Tissot, url: "https://www.tissottiming.com/{year}/tdf/en-gb" }
   social:
     - { text: Instagram, url: "https://www.instagram.com/letourdefrance/" }
     - { text: Facebook, url: "https://www.facebook.com/letour" }

@@ -307,6 +307,39 @@ describe("learning from old threads", () => {
   });
 });
 
+describe("link patterns from the registry", () => {
+  const reg = parseRegistry(
+    [
+      "giro-me:",
+      "  name: Giro d'Italia",
+      "  category: ME",
+      "  cells: { stage: 'https://www.giroditalia.it/en/stage-{stage}/', type: 'https://img.example/{year}/{stage2}.png' }",
+      "  links:",
+      "    - { row: tracker, text: Tissot, url: 'https://www.tissottiming.com/{year}/gdi/en-gb' }",
+      "    - { row: watch, text: CourseDuJour, url: 'https://coursedujour.com/day/{date}/' }",
+      "    - { row: information, text: Stage info, url: 'https://sanluca.cc/{year}/{stage}/' }",
+    ].join(String.fromCharCode(10)),
+  );
+  const s = parseSeason(
+    ["season: 2027", "races:", "  - race: giro-me", "    class: 2.UWT", "    mega: true", "    stages: [{ n: 3, date: 2027-05-11, type: Hard }]"].join(String.fromCharCode(10)),
+    reg,
+  );
+  const ts = renderSeason(profile, reg, s);
+  const stage = ts.find((t) => t.kind === "stage")!.body;
+  const mega = ts.find((t) => t.kind === "mega")!.body;
+  it("fills the stage table and the info rows for each stage", () => {
+    expect(stage).toContain("|[3](https://www.giroditalia.it/en/stage-3/)|");
+    expect(stage).toContain("|[Hard](https://img.example/2027/03.png)|");
+    expect(stage).toContain("|Live Trackers|[Tissot](https://www.tissottiming.com/2027/gdi/en-gb)|");
+    expect(stage).toContain("[CourseDuJour](https://coursedujour.com/day/2027-05-11/)");
+    expect(stage).toContain("[Stage info](https://sanluca.cc/2027/3/)");
+  });
+  it("leaves stage patterns out of the overall thread", () => {
+    expect(mega).toContain("[Tissot](https://www.tissottiming.com/2027/gdi/en-gb)");
+    expect(mega).not.toContain("sanluca.cc");
+  });
+});
+
 describe("coverage start", () => {
   const s = parseSeason(
     [
@@ -379,7 +412,8 @@ describe("table features", () => {
   it("named layout: stage first, comma length without unit, month-name date", () => {
     const t = renderSeason(profile, registry, stageRace, undefined, { table: "stage-first" })[0]!;
     expect(t.body).toContain("|Stage|Date|Route|Length|Type|Altitude|Finish|Time|");
-    expect(t.body).toContain("|21|Sun. 13.Sep|Granada > Granada|99,4|");
+    // the stage number links by the registry's pattern (letour.fr/en/stage-{stage})
+    expect(t.body).toContain("|[21](https://www.letour.fr/en/stage-21)|Sun. 13.Sep|Granada > Granada|99,4|");
   });
   it("a race can choose its own layout over the default", () => {
     const r = mk([

@@ -29,6 +29,13 @@ export interface RegistryRace {
   /** Info-row items that carry over every year, per row id (information, previews, ...). */
   info?: Record<string, InfoValue>;
   tz?: string; // time zone label, e.g. CET (CET/CEST, WET/WEST, EET/EEST follow the date by themselves)
+  /**
+   * Links built from a pattern in every thread, per info row: tokens {year} {yy} {date} {yyyymmdd}
+   * {stage} {stage2} (see patterns.ts). A pattern with {stage} is left out of one-day and overall threads.
+   */
+  links?: { row: string; text: string; url: string }[];
+  /** Patterns for the links in the stage table, used when a stage has no address of its own. */
+  cells?: { stage?: string; route?: string; type?: string; finish?: string };
 }
 
 /** One racing day: a one-day race or one stage. */
