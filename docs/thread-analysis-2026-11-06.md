@@ -82,6 +82,9 @@ What the old r/peloton race threads have in common, what changes from year to ye
 - **Fix:** later: climbs and sprints need a data source per stage; "Past editions" can be built from FirstCycling results links for earlier years plus links the moderator adds.
 - **Effort:** large. **Recommendation:** Later.
 
+## Decisions (2026-11-06)
+Yes to cards 1, 2, 3, 5, 6, 7, 8, 9 and 10; Later for 4 (the /r/peloton content row via the finder) and 11 (climbs, sprints, teams, past editions). All nine Yes cards were built the same day: 5 `4c274a2`, 8 `86b7750`, 6 `0befa05`, 9 `bcf157e`, 10 `ab66c5d`, 7 `a382f1c`, 2 `ae36eb4`, 3 `7faa08d`, 1 in the commit after it. Card 1 works from the "Learn from old threads" box on the Threads page: paste old threads (or the finder's copied JSON); last year's edition-only links are written as a comment above the race in the season, to replace or drop.
+
 ## Considered and not proposed
 - **Carrying previews over:** every year's previews are new articles; only the pattern pages (card 2) carry.
 - **Writing the rest-day and presentation texts:** they are personal, hand-written texts; the builder gives the frame only.

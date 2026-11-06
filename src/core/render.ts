@@ -99,6 +99,11 @@ function mdLink(l: InfoLink): string {
   return l.url ? "[" + l.text + "](" + l.url + ")" : l.text;
 }
 
+function sameUrl(a: string, b: string): boolean {
+  const n = (u: string) => u.trim().replace(/^http:/, "https:").replace("://www.", "://").replace(/\/+$/, "").toLowerCase();
+  return n(a) === n(b);
+}
+
 function link(text: string, url: string | undefined): string {
   return url ? "[" + text + "](" + url + ")" : text;
 }
@@ -242,8 +247,10 @@ function infoTable(kind: "oneday" | "stage", leg: Leg, ctx: Ctx): string {
     const links: InfoLink[] = [...autoItems(row, ctx), ...patternLinks(row.id, leg, ctx)];
     for (const v of layers) {
       if (!v) continue;
-      if (Array.isArray(v)) links.push(...v);
-      else md = v.md;
+      if (Array.isArray(v)) {
+        // a link the registry already gives (learned from old threads) is not repeated by the season's own
+        for (const l of v) if (!links.some((x) => x.url && l.url && sameUrl(x.url, l.url))) links.push(l);
+      } else md = v.md;
     }
     let text = md ?? links.map(mdLink).join(" / ");
     const cov = coverageText(row.id, leg, ctx);

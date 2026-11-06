@@ -334,6 +334,14 @@ describe("link patterns from the registry", () => {
     expect(stage).toContain("[CourseDuJour](https://coursedujour.com/day/2027-05-11/)");
     expect(stage).toContain("[Stage info](https://sanluca.cc/2027/3/)");
   });
+  it("does not repeat a registry link that the season gives as well", () => {
+    const s2 = parseSeason(
+      ["season: 2027", "races:", "  - race: giro-me", "    class: 2.UWT", "    info: { tracker: [{ text: Tissot, url: 'http://tissottiming.com/2027/gdi/en-gb/' }] }", "    stages: [{ n: 3, date: 2027-05-11 }]"].join(String.fromCharCode(10)),
+      reg,
+    );
+    const body = renderSeason(profile, reg, s2).find((t) => t.kind === "stage")!.body;
+    expect(body.match(/Tissot/g)).toHaveLength(1);
+  });
   it("leaves stage patterns out of the overall thread", () => {
     expect(mega).toContain("[Tissot](https://www.tissottiming.com/2027/gdi/en-gb)");
     expect(mega).not.toContain("sanluca.cc");

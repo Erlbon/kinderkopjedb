@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { applyLearned, learnFromYears } from "../src/core/learn";
+import { applyLearned, lastYearHints, learnFromYears } from "../src/core/learn";
 import { parseOldThread } from "../src/core/thread-import";
 import type { RegistryRace } from "../src/core/types";
 
@@ -68,6 +68,22 @@ describe("learning from two or more years", () => {
     expect(entry.cells?.stage).toBe("https://www.letour.fr/en/stage-{stage}");
     expect(said.some((s) => s.startsWith("tracker: Tissot"))).toBe(true);
     expect(applyLearned(entry, learned)).toEqual([]);
+  });
+
+  it("lists what belonged to the newest edition only, to be replaced in the next", () => {
+    const h = lastYearHints(threads, learned)!;
+    expect(h.year).toBe(2024);
+    const row = (r: string) => h.rows.find((x) => x.row === r)?.links.map((l) => l.text);
+    expect(row("information")).toEqual(["Roadbook"]); // the official site and start list carry over
+    expect(row("content")).toEqual(["Cheat Notes"]);
+    expect(row("tracker")).toEqual(["Velon"]); // race centre and Tissot are lasting
+    expect(row("previews")).toBeUndefined(); // CyclingNews is stable, INRNG a pattern
+  });
+
+  it("in a stage race, a link in one stage thread only is that stage's, not the edition's", () => {
+    const ts = [tour(2025, 1), tour(2025, 2, " / [Stage 2 extra](https://example.com/s2)"), tour(2025, 3)].map(parseOldThread);
+    const h = lastYearHints(ts)!;
+    expect(h.rows.find((x) => x.row === "tracker")!.links.map((l) => l.text)).toEqual(["Official", "Tissot"]);
   });
 
   it("one year alone teaches nothing", () => {

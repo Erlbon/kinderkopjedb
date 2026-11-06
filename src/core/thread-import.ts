@@ -8,7 +8,7 @@ export interface ParsedThread {
   category?: string; // ME / WE
   tag?: string; // as written in the title ("ME", "Men Elite", "")
   klass?: string; // 1.UWT, 2.UWT, ...
-  kind: "race" | "stage" | "rest" | "unknown";
+  kind: "race" | "stage" | "rest" | "presentation" | "unknown";
   stage?: number;
   rows: Record<string, InfoValue>; // by info-row id
   labels: Record<string, string>; // the label each row had in this thread ("Overall Previews")
@@ -77,10 +77,16 @@ function parseTitle(line: string): Partial<ParsedThread> {
   if (stage) {
     out.kind = "stage";
     out.stage = +stage[1]!;
-    t = t.replace(stage[0], "");
+    // what follows the stage number is about the stage ("- ITT", "TTT", "(final)"), not the race: keep only the class
+    const after = t.slice(stage.index + stage[0].length);
+    const cls = /\(([^)]*\d\.[A-Za-z0-9]+|WC)\)\s*$/.exec(after);
+    t = t.slice(0, stage.index) + (cls ? " " + cls[0] : "");
   } else if (/\bRest Day\b/i.test(t)) {
     out.kind = "rest";
     t = t.replace(/\s*Rest Day\s*\d*/i, "");
+  } else if (/\bTeam Presentation\b/i.test(t)) {
+    out.kind = "presentation";
+    t = t.replace(/\s*[–-]?\s*Team Presentation/i, "");
   } else {
     out.kind = "race";
   }

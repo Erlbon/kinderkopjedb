@@ -101,6 +101,50 @@ export function learnFromYears(threads: ParsedThread[]): Learned {
   return out;
 }
 
+/** Last year's links that belong to that edition only: to be replaced (or dropped) for the new one. */
+export interface LastYearHints {
+  year: number;
+  rows: { row: string; links: InfoLink[]; md?: string }[];
+}
+
+/**
+ * The year-specific part of the newest edition among these threads (roadbook, previews, TV ...),
+ * as hints for drafting the next one (card 1). In a stage race only what most of that year's
+ * stage threads share counts; a link in one stage thread belongs to that stage.
+ */
+export function lastYearHints(threads: ParsedThread[], learned?: Learned): LastYearHints | undefined {
+  const years = threads.map((t) => t.year).filter((y): y is number => y !== undefined);
+  if (!years.length) return undefined;
+  const year = Math.max(...years);
+  const last = threads.filter((t) => t.year === year);
+  const lasting = new Set((learned?.links ?? []).map((l) => l.row + " " + norm(toPattern(l.url, { year }))));
+  const rows = new Map<string, { counts: Map<string, { link: InfoLink; n: number }>; md: Map<string, number> }>();
+  for (const t of last) {
+    for (const [row, v] of Object.entries(t.rows)) {
+      if (row === "social") continue;
+      let r = rows.get(row);
+      if (!r) rows.set(row, (r = { counts: new Map(), md: new Map() }));
+      if (!Array.isArray(v)) r.md.set(v.md, (r.md.get(v.md) ?? 0) + 1);
+      for (const l of linksOf(v)) {
+        // the r/peloton posts (pre-race thread, cheat notes ...) are new each year: exactly what to replace
+        if (!l.url || (row !== "content" && handledElsewhere(row, l)) || lasting.has(row + " " + norm(toPattern(l.url, { year })))) continue;
+        const k = norm(l.url);
+        const c = r.counts.get(k);
+        if (c) c.n++;
+        else r.counts.set(k, { link: l, n: 1 });
+      }
+    }
+  }
+  const half = last.length / 2;
+  const out: LastYearHints = { year, rows: [] };
+  for (const [row, r] of rows) {
+    const links = [...r.counts.values()].filter((c) => c.n > half || last.length === 1).map((c) => c.link);
+    const md = [...r.md].sort((a, b) => b[1] - a[1])[0]?.[0];
+    if (links.length || md) out.rows.push({ row, links, ...(md && !links.length ? { md } : {}) });
+  }
+  return out;
+}
+
 /** Put what was learned into a registry entry; returns lines saying what was added. */
 export function applyLearned(entry: RegistryRace, learned: Learned): string[] {
   const said: string[] = [];

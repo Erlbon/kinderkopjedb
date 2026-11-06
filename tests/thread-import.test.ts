@@ -23,6 +23,26 @@ describe("table layouts", () => {
   });
 });
 
+describe("thread kinds", () => {
+  it("keeps what follows the stage number out of the race name", () => {
+    for (const title of [
+      "[Race Thread] 2025 Tour de France – Stage 5 - ITT (2.UWT)",
+      "[Race Thread] 2024 Paris-Nice - Stage 3 TTT (2.UWT)",
+      "[Race Thread] 2025 Paris-Nice - Stage 8 (final) (2.UWT)",
+    ]) {
+      const p = parseOldThread(title);
+      expect(p.kind, title).toBe("stage");
+      expect(p.klass, title).toBe("2.UWT");
+      expect(["Tour de France", "Paris-Nice"], title).toContain(p.name);
+    }
+  });
+
+  it("knows a team presentation thread, with or without a dash", () => {
+    expect(parseOldThread("[Race Thread] 2024 Tour de France – Team Presentation")).toMatchObject({ kind: "presentation", name: "Tour de France" });
+    expect(parseOldThread("[Race Thread] 2025 Tour de France Team Presentation")).toMatchObject({ kind: "presentation", name: "Tour de France" });
+  });
+});
+
 describe("row labels as r/peloton threads write them", () => {
   it("reads ticker, TV & Streams and Live coverage rows, and the 'Outlet type' header", () => {
     const md = [

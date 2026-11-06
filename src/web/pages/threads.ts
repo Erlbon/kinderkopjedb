@@ -2,14 +2,16 @@ import profileYaml from "../../../data/profiles/peloton.yaml";
 import registryYaml from "../../../data/peloton/races.yaml";
 import fixturesYaml from "../../../data/peloton/2026-fixtures.yaml";
 import classesYaml from "../../../data/classes.yaml";
-import { parse as yamlParse, stringify as yamlStringify } from "yaml";
+import { isMap, isSeq, parse as yamlParse, parseDocument, stringify as yamlStringify } from "yaml";
 import {
+  LastYearHints,
   RegistryRace,
   SeasonError,
   Thread,
   applyLearned,
   draftSeason,
   fetchWikitext,
+  lastYearHints,
   learnFromYears,
   lookupRace,
   parseClasses,
@@ -229,6 +231,43 @@ export function initThreads(store: Store): void {
     }
   }
 
+  /**
+   * The threads in a paste: markdown (split at each "[Race Thread]" title), or the JSON the
+   * thread finder on Reddit copies (its titles may lack the year; the edition's year is put in).
+   */
+  function pastedThreads(text: string): string[] {
+    const t = text.trim();
+    if (!t.startsWith("{")) return splitThreads(text);
+    const data = JSON.parse(t) as { results?: { edition: { year: number }; match: { threads: { post: { title: string; body?: string } }[] } }[] };
+    const out: string[] = [];
+    for (const r of data.results ?? []) {
+      for (const th of r.match.threads) {
+        let title = th.post.title;
+        if (!/\b(19|20)\d\d\b/.test(title)) title = title.replace(/^(\s*\[Race Thread\]\s*)/i, "$1" + r.edition.year + " ");
+        out.push(title + NL + (th.post.body ?? ""));
+      }
+    }
+    return out;
+  }
+
+  /** Last year's edition-only links, written as a comment above the race in the season (or returned when the race is not there). */
+  function hintSeason(id: string, hints: LastYearHints): boolean {
+    const doc = parseDocument(seasonBox().value);
+    const seasonYear = Number(doc.get("season"));
+    const races = doc.get("races");
+    if (!isSeq(races) || !(seasonYear > hints.year)) return false;
+    const node = races.items.find((it) => isMap(it) && it.get("race") === id);
+    if (!node || !isMap(node)) return false;
+    const lines = [" From the " + hints.year + " thread, replace or drop (they belonged to that edition):"];
+    for (const r of hints.rows) {
+      const what = r.links.length ? r.links.map((l) => l.text + " " + l.url).join(" / ") : (r.md ?? "");
+      lines.push("   " + r.row + ": " + what);
+    }
+    node.commentBefore = lines.join(NL);
+    seasonBox().value = doc.toString({ lineWidth: 0 });
+    return true;
+  }
+
   /** Split a paste of several old threads at each "[Race Thread]" title line. */
   function splitThreads(text: string): string[] {
     const parts: string[] = [];
@@ -247,28 +286,56 @@ export function initThreads(store: Store): void {
       const reg = registryObj();
       const lines: string[] = [];
       const byRace = new Map<string, ReturnType<typeof parseOldThread>[]>();
-      for (const md of splitThreads($<HTMLTextAreaElement>("oldthreads").value)) {
+      // one line per race and year, however many stage threads it had
+      const said = new Map<string, { added: boolean; threads: number; left: Set<string>; notes: Set<string> }>();
+      let other = 0;
+      for (const md of pastedThreads($<HTMLTextAreaElement>("oldthreads").value)) {
         const parsed = parseOldThread(md);
         if (!parsed.name) {
           lines.push("Skipped a block: no [Race Thread] title found.");
           continue;
         }
+        // rest days and team presentations are written by hand: nothing for the registry
+        if (parsed.kind === "rest" || parsed.kind === "presentation") {
+          other++;
+          continue;
+        }
         const r = toRegistryEntry(parsed, reg[slugifyId(parsed)] as RegistryRace | undefined, profile);
         byRace.set(r.id, [...(byRace.get(r.id) ?? []), parsed]);
-        const had = reg[r.id] !== undefined;
+        const key = r.id + " " + (parsed.year ?? "?");
+        let s = said.get(key);
+        if (!s) said.set(key, (s = { added: reg[r.id] === undefined, threads: 0, left: new Set(), notes: new Set() }));
+        s.threads++;
+        Object.keys(r.yearOnly).forEach((k) => s.left.add(k));
+        r.notes.forEach((n) => s.notes.add(n));
         reg[r.id] = r.entry;
-        const left = Object.keys(r.yearOnly);
+      }
+      for (const [key, s] of said) {
+        const [id, year] = key.split(" ");
         lines.push(
-          (had ? "Updated " : "Added ") + r.id + " from the " + (parsed.year ?? "?") + " thread" +
-            (left.length ? " (year-specific rows left out: " + left.join(", ") + ")" : "") +
-            (r.notes.length ? ". " + r.notes.join(". ") : ""),
+          (s.added ? "Added " : "Updated ") + id + " from the " + year + (s.threads > 1 ? " threads (" + s.threads + ")" : " thread") +
+            (s.left.size ? " (year-specific rows left out: " + [...s.left].join(", ") + ")" : "") +
+            (s.notes.size ? ". " + [...s.notes].join(". ") : ""),
         );
       }
+      if (other) lines.push(other + " rest-day or team-presentation thread" + (other > 1 ? "s" : "") + " skipped (hand-written).");
       // Threads of two or more years of a race: what they share goes to the registry as links or patterns.
       for (const [id, parsed] of byRace) {
-        if (new Set(parsed.map((p) => p.year)).size < 2) continue;
-        const said = applyLearned(reg[id] as RegistryRace, learnFromYears(parsed));
-        lines.push(said.length ? id + ", learned from several years:" + NL + said.map((s) => "  " + s).join(NL) : id + ": nothing new shared by the years.");
+        const learned = learnFromYears(parsed);
+        if (new Set(parsed.map((p) => p.year)).size >= 2) {
+          const said = applyLearned(reg[id] as RegistryRace, learned);
+          lines.push(said.length ? id + ", learned from several years:" + NL + said.map((s) => "  " + s).join(NL) : id + ": nothing new shared by the years.");
+        }
+        // Start from last year: what belonged to the newest edition goes above the race in the season, to replace
+        const hints = lastYearHints(parsed, learned);
+        if (hints?.rows.length) {
+          if (hintSeason(id, hints)) lines.push(id + ": last year's edition-only links are noted above the race in the season, to replace or drop.");
+          else
+            lines.push(
+              id + ", the " + hints.year + " edition's own links (add the race to the season to get them there):" + NL +
+                hints.rows.map((r) => "  " + r.row + ": " + (r.links.length ? r.links.map((l) => l.text + " " + l.url).join(" / ") : r.md)).join(NL),
+            );
+        }
       }
       registryBox().value = yamlStringify(reg, { lineWidth: 0 });
       msg.textContent = lines.join(NL) + (lines.length ? NL + "Open the race registry below to review." : "");
