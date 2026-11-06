@@ -203,19 +203,28 @@ export function toRegistryEntry(p: ParsedThread, existing?: RegistryRace, profil
     // Row labels this race uses when they differ from the profile's ("Overall Previews").
     const defaults = new Map(profile.infoRows.map((r) => [r.id, r.label.toLowerCase()]));
     for (const [id, label] of Object.entries(p.labels)) {
-      if (defaults.has(id) && defaults.get(id) !== label.toLowerCase()) {
+      if (!defaults.has(id)) continue;
+      if (defaults.get(id) !== label.toLowerCase()) {
         entry.labels = { ...(entry.labels ?? {}), [id]: label };
+      } else if (entry.labels?.[id]) {
+        // a newer thread went back to the standard label: forget the old one
+        const rest = { ...entry.labels };
+        delete rest[id];
+        if (Object.keys(rest).length) entry.labels = rest;
+        else delete entry.labels;
       }
     }
     // The table layout this race used, if it matches one of the profile's named variants.
     const kind = p.kind === "stage" ? "stage" : "oneday";
-    const same = (cols: { header: string }[] | undefined) =>
-      !!cols &&
-      cols.length === p.tableHeader.length &&
-      cols.every((c, i) => sameHeader(c.header, p.tableHeader[i] ?? ""));
+    // An optional column (Altitude on one-day races) may be absent from the old table.
+    const sameCols = (cols: { header: string }[]) =>
+      cols.length === p.tableHeader.length && cols.every((c, i) => sameHeader(c.header, p.tableHeader[i] ?? ""));
+    const same = (cols: { header: string; optional?: boolean }[] | undefined) =>
+      !!cols && (sameCols(cols) || sameCols(cols.filter((c) => !c.optional || p.tableHeader.some((h) => sameHeader(h, c.header)))));
     const variants = profile.tables.variants ?? {};
     const hit = Object.entries(variants).find(([, v]) => same(v[kind]));
-    if (hit && !same(profile.tables[kind])) entry.table = hit[0];
+    if (same(profile.tables[kind])) delete entry.table; // back to the standard layout (Flanders 2026 after 2025)
+    else if (hit) entry.table = hit[0];
     else if (!hit && p.tableHeader.length && !same(profile.tables[kind])) {
       notes.push("Table layout (" + p.tableHeader.join(" | ") + ") matches no known layout; set one up in the layout editor");
     }
@@ -231,7 +240,9 @@ export function toRegistryEntry(p: ParsedThread, existing?: RegistryRace, profil
       if (fc) {
         const q = new URLSearchParams(fc[1]);
         if (q.get("r")) entry.firstcycling = Number(q.get("r"));
-        if (q.get("k") && q.get("k") !== "8") entry.firstcyclingClass = Number(q.get("k"));
+        // k=8 is the default; "k=start" (an old start-list link) is no class number
+        const k = q.get("k");
+        if (k && k !== "8" && /^\d+$/.test(k)) entry.firstcyclingClass = Number(k);
       } else if (/wikipedia\.org/.test(u)) {
         entry.wikipedia = u;
       } else if (/^official( site)?$/.test(t)) {

@@ -23,6 +23,45 @@ describe("table layouts", () => {
   });
 });
 
+describe("registry entries from several years (monuments, 2021-2026)", () => {
+  const thread = (year: number, label: string, fc: string) =>
+    parseOldThread(
+      [
+        "[Race Thread] " + year + " Il Lombardia (1.UWT)",
+        "|Date|From > To|Length|Type|Finish|Time|",
+        "|:-|:-|:-|:-|:-|:-|",
+        "|10.10|Bergamo > Como|239km|Hilly|Flat|11:00 - 17:00 CEST|",
+        "",
+        "|||",
+        "|:-|:-|",
+        "|Information|[Official](https://www.ilombardia.it/en/) / [Start List](https://firstcycling.com/race.php?r=24&y=" + year + "&k=" + fc + ")|",
+        "|" + label + "|[PCS](https://www.procyclingstats.com/race/il-lombardia/" + year + "/result/live)|",
+      ].join(NL),
+    );
+
+  it("an old 'k=start' start-list link is not a class number", () => {
+    expect(toRegistryEntry(thread(2021, "Live Trackers", "start"), undefined, profile).entry.firstcyclingClass).toBeUndefined();
+  });
+
+  it("the standard one-day table is known even without its optional Altitude column", () => {
+    const r = toRegistryEntry(thread(2026, "Live Trackers", "8"), undefined, profile);
+    expect(r.entry.table).toBeUndefined();
+    expect(r.notes.join(" ")).not.toContain("matches no known layout");
+  });
+
+  it("a layout from an old year is dropped when a newer thread uses the standard one", () => {
+    const old = toRegistryEntry(parseOldThread(read("tests/fixtures/old-strade-2024-we.md")), undefined, profile).entry;
+    expect(old.table).toBe("profile");
+    expect(toRegistryEntry(thread(2026, "Live Trackers", "8"), old, profile).entry.table).toBeUndefined();
+  });
+
+  it("a row label from an old year is dropped when a newer thread uses the standard one", () => {
+    const old = toRegistryEntry(thread(2022, "Live Tracker", "8"), undefined, profile).entry;
+    expect(old.labels).toEqual({ tracker: "Live Tracker" });
+    expect(toRegistryEntry(thread(2026, "Live Trackers", "8"), old, profile).entry.labels).toBeUndefined();
+  });
+});
+
 describe("thread kinds", () => {
   it("keeps what follows the stage number out of the race name", () => {
     for (const title of [

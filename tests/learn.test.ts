@@ -86,6 +86,17 @@ describe("learning from two or more years", () => {
     expect(h.rows.find((x) => x.row === "tracker")!.links.map((l) => l.text)).toEqual(["Official", "Tissot"]);
   });
 
+  it("a link no longer used in the newest year is not lasting (an old Twitter account)", () => {
+    const ts = [
+      tour(2021, 6, " / [Official Twitter](https://twitter.com/LeTour)"),
+      tour(2022, 6, " / [Official Twitter](https://twitter.com/LeTour)"),
+      tour(2023, 6),
+    ].map(parseOldThread);
+    const urls = learnFromYears(ts).links.map((l) => l.url).join(" ");
+    expect(urls).not.toContain("twitter");
+    expect(urls).toContain("racecenter.letour.fr");
+  });
+
   it("one year alone teaches nothing", () => {
     expect(learnFromYears([tour(2025, 1), tour(2025, 2)].map(parseOldThread))).toEqual({ links: [], cells: [] });
   });

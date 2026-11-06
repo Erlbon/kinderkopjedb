@@ -84,16 +84,18 @@ export function learnFromYears(threads: ParsedThread[]): Learned {
   }
 
   const commonText = (g: Group) => [...g.texts].sort((a, b) => b[1] - a[1])[0]![0];
+  // Only links still in use in the newest year count: an old Twitter account in 2021-2022 is not lasting.
+  const newest = Math.max(...threads.map((t) => t.year ?? 0));
   const out: Learned = { links: [], cells: [] };
   for (const g of groups.values()) {
-    if (g.years.size < 2) continue;
+    if (g.years.size < 2 || !g.years.has(newest)) continue;
     const kind = g.raws.size === 1 ? "stable" : "pattern";
     if (kind === "pattern" && !g.url.includes("{")) continue;
     out.links.push({ row: g.row, text: commonText(g), url: g.url, years: [...g.years].sort(), kind });
   }
   for (const g of cells.values()) {
     // a cell link is only worth a pattern when it follows the stage or year
-    if (g.years.size < 2 || !g.url.includes("{")) continue;
+    if (g.years.size < 2 || !g.years.has(newest) || !g.url.includes("{")) continue;
     const field = g.row as Learned["cells"][number]["field"];
     if (out.cells.some((c) => c.field === field)) continue;
     out.cells.push({ field, url: g.url, years: [...g.years].sort() });

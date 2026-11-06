@@ -48,3 +48,72 @@ tour-de-france-me:
     - { text: Youtube, url: "https://www.youtube.com/c/LeTourDeFrance/videos" }
     - { text: Dailymotion, url: "https://www.dailymotion.com/tourdefrance" }
     - { text: Tiktok, url: "https://www.tiktok.com/@letourdefrance" }
+
+# The five monuments, men (v1 of the r/peloton moderator app). Learned 2026-11-06 from the
+# r/peloton race threads 2021-2026 with the thread finder: ids, socials and layout from the
+# newest thread, links that the threads of two or more years (the newest among them) share.
+
+milano-sanremo-me:
+  name: Milano-Sanremo
+  category: ME
+  table: profile
+  officialSite: https://www.milanosanremo.it/en/
+  pcs: milano-sanremo
+  firstcycling: 4
+  social:
+    - { text: Instagram, url: "https://www.instagram.com/milanosanremo_/" }
+    - { text: Facebook, url: "https://www.facebook.com/misanremo/" }
+    - { text: Twitter, url: "https://twitter.com/Milano_Sanremo" }
+
+ronde-van-vlaanderen-me:
+  name: Ronde van Vlaanderen
+  category: ME
+  titleTag: ME
+  officialSite: https://www.rondevanvlaanderen.be/en/race/men-elite/race-info
+  pcs: ronde-van-vlaanderen
+  firstcycling: 5
+  social:
+    - { text: Instagram, url: "https://www.instagram.com/rondevanvlaanderen/" }
+    - { text: Facebook, url: "https://www.facebook.com/rondevanvlaanderen" }
+    - { text: Twitter, url: "https://twitter.com/RondeVlaanderen" }
+  links:
+    - { row: watch, text: Official Broadcasters, url: "https://www.rondevanvlaanderen.be/en/race/men-elite/race-info?tab=broadcasters-26" }
+
+paris-roubaix-me:
+  name: Paris-Roubaix
+  category: ME
+  table: profile
+  officialSite: https://www.paris-roubaix.fr/en
+  pcs: paris-roubaix
+  firstcycling: 8
+  social:
+    - { text: Instagram, url: "https://www.instagram.com/parisroubaixcourse/" }
+    - { text: Facebook, url: "https://www.facebook.com/ParisRoubaix/" }
+    - { text: Twitter, url: "https://twitter.com/parisroubaix" }
+  links:
+    - { row: tracker, text: Official, url: "https://racecenter.paris-roubaix.fr/en/" }
+
+liege-bastogne-liege-me:
+  name: Liège-Bastogne-Liège
+  category: ME
+  titleTag: ME
+  table: profile
+  officialSite: https://www.liege-bastogne-liege.be/en
+  pcs: liege-bastogne-liege
+  firstcycling: 11
+  social:
+    - { text: Instagram, url: "https://www.instagram.com/classiquesardennes/" }
+    - { text: Facebook, url: "https://www.facebook.com/liegebastogneliege" }
+    - { text: Twitter, url: "https://twitter.com/liegebastogne" }
+
+il-lombardia-me:
+  name: Il Lombardia
+  category: ME
+  labels: { tracker: Live Tracker }
+  officialSite: https://www.ilombardia.it/en/
+  firstcycling: 24
+  social:
+    - { text: Instagram, url: "https://www.instagram.com/ilombardia/" }
+    - { text: Facebook, url: "https://www.facebook.com/il.lombardia/" }
+    - { text: Twitter, url: "https://x.com/Il_Lombardia" }
+    - { text: Youtube, url: "https://www.youtube.com/channel/UCe10BxbsFg9Kbmkg-ean_Dg" }
