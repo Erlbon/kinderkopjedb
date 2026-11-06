@@ -13,6 +13,7 @@ export interface ParsedThread {
   rows: Record<string, InfoValue>; // by info-row id
   labels: Record<string, string>; // the label each row had in this thread ("Overall Previews")
   tableHeader: string[]; // column headers of the first table
+  tableRow: string[]; // the first row of that table (the race or the stage), as written
   unknownLabels: string[];
 }
 
@@ -111,6 +112,7 @@ export function parseOldThread(markdown: string): ParsedThread {
     rows: {},
     labels: {},
     tableHeader: [],
+    tableRow: [],
     unknownLabels: [],
     ...head,
   };
@@ -127,6 +129,11 @@ export function parseOldThread(markdown: string): ParsedThread {
     // The first wide row is the header of the route/stage table.
     if (result.tableHeader.length === 0 && parts.length >= 4) {
       result.tableHeader = parts.map((c) => cleanText(c));
+      continue;
+    }
+    // ... and the first wide row after it is the race or stage itself
+    if (result.tableRow.length === 0 && parts.length >= 4) {
+      result.tableRow = parts.map((c) => c.trim());
       continue;
     }
     const key = LABELS[label.toLowerCase()];

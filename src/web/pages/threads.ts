@@ -7,8 +7,10 @@ import {
   RegistryRace,
   SeasonError,
   Thread,
+  applyLearned,
   draftSeason,
   fetchWikitext,
+  learnFromYears,
   lookupRace,
   parseClasses,
   parseIcs,
@@ -244,6 +246,7 @@ export function initThreads(store: Store): void {
     try {
       const reg = registryObj();
       const lines: string[] = [];
+      const byRace = new Map<string, ReturnType<typeof parseOldThread>[]>();
       for (const md of splitThreads($<HTMLTextAreaElement>("oldthreads").value)) {
         const parsed = parseOldThread(md);
         if (!parsed.name) {
@@ -251,6 +254,7 @@ export function initThreads(store: Store): void {
           continue;
         }
         const r = toRegistryEntry(parsed, reg[slugifyId(parsed)] as RegistryRace | undefined, profile);
+        byRace.set(r.id, [...(byRace.get(r.id) ?? []), parsed]);
         const had = reg[r.id] !== undefined;
         reg[r.id] = r.entry;
         const left = Object.keys(r.yearOnly);
@@ -259,6 +263,12 @@ export function initThreads(store: Store): void {
             (left.length ? " (year-specific rows left out: " + left.join(", ") + ")" : "") +
             (r.notes.length ? ". " + r.notes.join(". ") : ""),
         );
+      }
+      // Threads of two or more years of a race: what they share goes to the registry as links or patterns.
+      for (const [id, parsed] of byRace) {
+        if (new Set(parsed.map((p) => p.year)).size < 2) continue;
+        const said = applyLearned(reg[id] as RegistryRace, learnFromYears(parsed));
+        lines.push(said.length ? id + ", learned from several years:" + NL + said.map((s) => "  " + s).join(NL) : id + ": nothing new shared by the years.");
       }
       registryBox().value = yamlStringify(reg, { lineWidth: 0 });
       msg.textContent = lines.join(NL) + (lines.length ? NL + "Open the race registry below to review." : "");
