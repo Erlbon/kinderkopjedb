@@ -148,7 +148,9 @@ export function matchEdition(e: Edition, posts: FoundPost[]): EditionMatch {
     if (seen.has(p.id)) continue;
     seen.add(p.id);
     const t = readTitle(p.title);
-    if (!t || t.year !== e.year || t.category !== (e.category ?? "ME") || !sameRace(t.name, e)) {
+    // some titles have no year ("[Race Thread] Paris-Nice - Stage 1", 2025): the post date stands in, the date check below confirms it
+    const year = t?.year ?? +p.createdAt.slice(0, 4);
+    if (!t || year !== e.year || t.category !== (e.category ?? "ME") || !sameRace(t.name, e)) {
       if (/race thread/i.test(p.title)) otherTitles.push({ title: p.title, createdAt: p.createdAt, permalink: p.permalink });
       continue;
     }

@@ -93,6 +93,27 @@ describe("matchEdition", () => {
     expect(m.threads).toEqual([]);
   });
 
+  it("takes the year from the post date when the title has none (Paris-Nice 2025)", () => {
+    const pn: Edition = {
+      name: "Paris-Nice",
+      year: 2025,
+      class: "2.UWT",
+      start: "2025-03-09",
+      end: "2025-03-16",
+      stages: [
+        { n: 3, date: "2025-03-11" },
+        { n: 8, date: "2025-03-16" },
+      ],
+    };
+    const m = matchEdition(pn, [
+      post("3", "[Race Thread] Paris-Nice - Stage 3 (TTT) (2.UWT)", "2025-03-11T07:01:00Z"),
+      post("8", "[Race Thread] Paris-Nice - Stage 8 (final) (2.UWT)", "2025-03-16T07:01:00Z"),
+      post("old", "[Race Thread] Paris-Nice - Stage 3 (2.UWT)", "2024-03-05T07:01:00Z"),
+    ]);
+    expect(m.threads.map((t) => t.post.id)).toEqual(["3", "8"]);
+    expect(m.missingStages).toEqual([]);
+  });
+
   it("keeps the team presentation apart from the overall thread", () => {
     const m = matchEdition(tdf, [
       post("tp", "[Race Thread] 2026 Tour de France – Team Presentation", "2026-07-02T16:30:00Z"),
