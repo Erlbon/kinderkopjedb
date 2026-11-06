@@ -307,6 +307,34 @@ describe("learning from old threads", () => {
   });
 });
 
+describe("team presentation thread", () => {
+  const s = parseSeason(
+    [
+      "season: 2026",
+      "races:",
+      "  - race: tour-de-france-me",
+      "    class: 2.UWT",
+      "    presentation: { date: 2026-07-02, start: '18:30', stream: 'https://www.youtube.com/@LeTourdeFrance' }",
+      "    stages: [{ n: 1, date: 2026-07-04 }]",
+    ].join(String.fromCharCode(10)),
+    registry,
+  );
+  const ts = renderSeason(profile, registry, s);
+  const p = ts.find((t) => t.kind === "presentation")!;
+  it("gets its own thread, first in posting order", () => {
+    expect(ts[0]).toBe(p);
+    expect(p.title).toBe("[Race Thread] 2026 Tour de France – Team Presentation");
+    expect(p.firstDate).toBe("2026-07-02");
+  });
+  it("says when it starts, in the reader's time zone too, and links the stream", () => {
+    expect(p.body).toBe(
+      "The official team presentation begins at 18:30 [CEST](https://www.timeanddate.com/worldclock/fixedtime.html?iso=20260702T1630&p1=1440). " +
+        "[Watch it live](https://www.youtube.com/@LeTourdeFrance)" + String.fromCharCode(10),
+    );
+    expect(p.warnings).toEqual([]);
+  });
+});
+
 describe("table features", () => {
   const mk = (extra: string[]) =>
     parseSeason(["season: 2026", "races:", ...extra].join(String.fromCharCode(10)), registry);

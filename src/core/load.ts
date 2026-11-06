@@ -87,6 +87,10 @@ export function parseSeason(text: string, registry: Record<string, RegistryRace>
         errors.push(w + ": 'restDays' must be a list of ISO dates");
       }
     }
+    const pres = raw.presentation;
+    if (pres !== undefined && (!isObj(pres) || !isIsoDate(pres.date))) {
+      errors.push(w + ": 'presentation' needs an ISO 'date'");
+    }
   });
   if (errors.length) throw new SeasonError(errors);
   return s as unknown as Season;

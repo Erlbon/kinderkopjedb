@@ -64,6 +64,8 @@ export interface SeasonRace extends Partial<Leg> {
   stages?: Stage[]; // present = stage race
   // race-level extra/notes apply to every thread of the race (via Leg's optional fields)
   restDays?: string[]; // ISO dates that get a rest-day thread (Grand Tours)
+  /** The team presentation (Grand Tours, two days before the start): gets a thread of its own. */
+  presentation?: { date: string; start?: string; stream?: string };
   mega?: boolean; // also a thread for the whole race
   tz?: string;
   roadbook?: string;
@@ -124,7 +126,7 @@ export interface InfoRowDef {
 export interface Profile {
   id: string;
   name: string;
-  titles: { oneday: string; stage: string; rest: string; mega: string };
+  titles: { oneday: string; stage: string; rest: string; mega: string; presentation?: string };
   /**
    * The default tables, plus named variants (different moderators lay tables out differently).
    * A variant may redefine the one-day table, the stage table, or both.
@@ -140,6 +142,8 @@ export interface Profile {
   restIntro: string; // placeholder where the moderator writes the recap
   restFooter: string; // standard closing block (wiki, FAQ, dictionary links)
   megaIntro: string;
+  /** Team presentation thread: {time} = start with zone, {stream} = the stream link line (empty without one). */
+  presentationIntro?: string;
   defaultIntro: string;
   placeholder: string; // shown where a value is still missing
   /**
@@ -151,7 +155,7 @@ export interface Profile {
   typeByAltitude?: { from?: number; to?: number; type: string }[];
 }
 
-export type ThreadKind = "race" | "stage" | "rest" | "mega";
+export type ThreadKind = "race" | "stage" | "rest" | "mega" | "presentation";
 
 export interface Thread {
   id: string;

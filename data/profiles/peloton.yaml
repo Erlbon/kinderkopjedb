@@ -17,6 +17,7 @@ titles:
   stage: "[Race Thread] {year} {name} – Stage {stage} ({class})"
   rest: "[Race Thread] {year} {name} Rest Day {n}"
   mega: "[Race Thread] {year} {name} {tag} ({class}) – overall"
+  presentation: "[Race Thread] {year} {name} – Team Presentation"
 
 tables:
   oneday:
@@ -89,5 +90,10 @@ restFooter: >-
 megaIntro: >-
   This is the overall thread for the whole race: general classification,
   predictions and general chat. Every stage also gets its own race thread.
+
+# Team presentation (the Grand Tours, two days before the start). {time} = start with the zone
+# linked to a converter, {stream} = "[Watch it live](...)" when a stream link is given.
+presentationIntro: >-
+  The official team presentation begins at {time}. {stream}
 
 defaultIntro: ""

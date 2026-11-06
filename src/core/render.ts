@@ -364,6 +364,26 @@ export function renderRace(
     out.push(thread(rctx, id + "-rest-" + (i + 1), "rest", title, body, date, date));
   });
 
+  if (race.presentation) {
+    const p = race.presentation;
+    const pctx = mkCtx(profile, race, registry, season, opts);
+    const title = fill(profile.titles.presentation ?? "[Race Thread] {year} {name} – Team Presentation", vars(pctx));
+    let time = "";
+    if (p.start) {
+      const zone = zoneFor(p.date, race.tz ?? pctx.reg?.tz ?? "CET");
+      const url = converterUrl(p.date, p.start, zone);
+      time = p.start + " " + (url ? "[" + zone + "](" + url + ")" : zone);
+    } else {
+      pctx.warnings.push("team presentation: start time missing");
+      time = profile.placeholder;
+    }
+    const stream = p.stream ? "[Watch it live](" + p.stream + ")" : "";
+    const intro = profile.presentationIntro ?? "The official team presentation begins at {time}. {stream}";
+    // fill() would squash the markdown spacing of a long template, so the two tokens are replaced directly
+    const body = intro.split("{time}").join(time).split("{stream}").join(stream).trim();
+    out.push(thread(pctx, id + "-presentation", "presentation", title, body, p.date, p.date));
+  }
+
   return out;
 }
 
@@ -383,7 +403,7 @@ export function renderSeason(
       all.push(t);
     }
   }
-  const rank = { mega: 0, race: 1, stage: 1, rest: 1 } as const;
+  const rank = { presentation: 0, mega: 0, race: 1, stage: 1, rest: 1 } as const;
   return all
     .map((t, i) => ({ t, i }))
     .sort(
