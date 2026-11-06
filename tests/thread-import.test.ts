@@ -1,7 +1,27 @@
+import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
-import { parseOldThread } from "../src/core/thread-import";
+import { parseProfile } from "../src/core";
+import { parseOldThread, toRegistryEntry } from "../src/core/thread-import";
 
 const NL = String.fromCharCode(10);
+const read = (p: string) => readFileSync(new URL("../" + p, import.meta.url), "utf8");
+const profile = parseProfile(read("data/profiles/peloton.yaml"));
+
+describe("table layouts", () => {
+  it("knows the Profile column of one-day races (Strade 2024 women)", () => {
+    const p = parseOldThread(read("tests/fixtures/old-strade-2024-we.md"));
+    const r = toRegistryEntry(p, undefined, profile);
+    expect(r.entry.table).toBe("profile");
+    expect(r.notes.join(" ")).not.toContain("matches no known layout");
+  });
+
+  it("takes 'Arrival time' and 'Timing' as the Time column", () => {
+    for (const time of ["Arrival time", "Timing"]) {
+      const md = ["[Race Thread] 2025 Strade Bianche (1.UWT)", "", "Date | From > To | Length | Profile | Finish | " + time, "--- | --- | --- | --- | --- | ---", "08.03 | Siena > Siena | 213km | Gravel | Uphill | 11:00"].join(NL);
+      expect(toRegistryEntry(parseOldThread(md), undefined, profile).entry.table).toBe("profile");
+    }
+  });
+});
 
 describe("row labels as r/peloton threads write them", () => {
   it("reads ticker, TV & Streams and Live coverage rows, and the 'Outlet type' header", () => {

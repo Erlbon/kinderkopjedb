@@ -157,6 +157,21 @@ export interface ImportResult {
 
 const isLinks = (v: InfoValue | undefined): v is InfoLink[] => Array.isArray(v);
 
+// Column headers written differently for the same thing (Tour 2024 "Elevation", Paris-Nice "Arrival time").
+const HEADER_SAME: Record<string, string> = {
+  elevation: "altitude",
+  timing: "time",
+  "arrival time": "time",
+};
+
+function sameHeader(a: string, b: string): boolean {
+  const n = (s: string) => {
+    const k = s.trim().toLowerCase();
+    return HEADER_SAME[k] ?? k;
+  };
+  return n(a) === n(b);
+}
+
 /**
  * Turn a parsed thread into a race-registry entry: the homepage, Wikipedia page,
  * social accounts, FirstCycling id and PCS slug carry over every year; everything
@@ -184,7 +199,7 @@ export function toRegistryEntry(p: ParsedThread, existing?: RegistryRace, profil
     const same = (cols: { header: string }[] | undefined) =>
       !!cols &&
       cols.length === p.tableHeader.length &&
-      cols.every((c, i) => c.header.toLowerCase() === (p.tableHeader[i] ?? "").toLowerCase());
+      cols.every((c, i) => sameHeader(c.header, p.tableHeader[i] ?? ""));
     const variants = profile.tables.variants ?? {};
     const hit = Object.entries(variants).find(([, v]) => same(v[kind]));
     if (hit && !same(profile.tables[kind])) entry.table = hit[0];

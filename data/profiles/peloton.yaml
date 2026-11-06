@@ -30,6 +30,15 @@ tables:
   # Moderators lay tables out differently. A variant replaces the one-day and/or
   # stage table; pick the default on the page, or per race with `table:` in the registry/season.
   variants:
+    profile:
+      label: Profile column (one-day races, as in Strade Bianche and Flanders 2024-2025)
+      oneday:
+        - { header: Date, field: date, format: "dd.mm" }
+        - { header: From > To, field: route }
+        - { header: Length, field: length }
+        - { header: Profile, field: type }
+        - { header: Finish, field: finish }
+        - { header: Time, field: time, format: " - " }
     stage-first:
       label: Stage first (as in the 2026 Vuelta threads)
       stage:
