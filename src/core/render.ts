@@ -1,5 +1,6 @@
 import { RaceClass, classWarnings } from "./classes";
 import { addDays, ddmm, yearOf } from "./dates";
+import { lintThread } from "./lint";
 import { converterUrl, zoneFor } from "./timezone";
 import {
   Column,
@@ -292,7 +293,7 @@ function thread(
     firstDate: first,
     lastDate: last,
     suggestedPost: addDays(first, -1),
-    warnings: ctx.warnings,
+    warnings: [...ctx.warnings, ...lintThread(body, ctx.year)],
   };
 }
 
