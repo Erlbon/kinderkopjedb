@@ -30,7 +30,7 @@ export interface FoundPost {
 }
 
 export interface MatchedThread {
-  kind: "race" | "stage" | "rest";
+  kind: ThreadTitleKind;
   stage?: number;
   post: FoundPost;
 }
@@ -43,16 +43,24 @@ export interface EditionMatch {
   missingRace: boolean;
   /** Race threads with this race's name and year that fell outside the dates; shown, not used. */
   outsideDates: FoundPost[];
+  /** Every other race-thread title the search returned (no body): shows why a race was missed. */
+  otherTitles: { title: string; createdAt: string; permalink: string }[];
 }
+
+/** "race" = a one-day race or the overall thread of a stage race; "presentation" = the team presentation. */
+export type ThreadTitleKind = "race" | "stage" | "rest" | "presentation";
 
 const DAYS_BEFORE = 2; // threads go up the day before, sometimes earlier
 const DAYS_AFTER = 1; // time zones: a US evening post is the next day in UTC
+
+// Combining accents U+0300-U+036F, built from char codes so no escape can get lost in an edit.
+const ACCENTS = new RegExp("[" + String.fromCharCode(0x300) + "-" + String.fromCharCode(0x36f) + "]", "g");
 
 /** Lower case, no accents, words only: "Liège–Bastogne–Liège" -> "liege bastogne liege". */
 export function normName(s: string): string {
   return s
     .normalize("NFD")
-    .replace(/[̀-ͯ]/g, "")
+    .replace(ACCENTS, "")
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, " ")
     .trim();
@@ -90,7 +98,7 @@ function sameRace(titleName: string, e: Edition): boolean {
  */
 export function readTitle(
   title: string,
-): { kind: "race" | "stage" | "rest"; year?: number; name: string; stage?: number; category: string } | undefined {
+): { kind: ThreadTitleKind; year?: number; name: string; stage?: number; category: string } | undefined {
   if (!/\[race thread\]/i.test(title)) return undefined;
   const t = parseOldThread(title);
   if (t.kind === "unknown") return undefined;
@@ -99,7 +107,7 @@ export function readTitle(
   const category = women ? "WE" : "ME";
   let name = t.name ?? "";
   let year = t.year;
-  let kind = t.kind;
+  let kind: ThreadTitleKind = t.kind;
   let stage = t.stage;
   if (year === undefined) {
     const y = /\b(20\d\d)\b/.exec(name);
@@ -111,7 +119,11 @@ export function readTitle(
   if (kind === "race") {
     // "Stage 6" without a dash, or a prologue (stage 0, as the database numbers it)
     const s = /[\s,:–-]*\b(?:Stage\s+(\d+)|Prologue)\b/i.exec(name);
-    if (s) {
+    const tp = /[\s,:–-]*\bTeam Presentation\b/i.exec(name);
+    if (tp) {
+      kind = "presentation";
+      name = name.replace(tp[0], " ");
+    } else if (s) {
       kind = "stage";
       stage = s[1] === undefined ? 0 : +s[1];
       name = name.replace(s[0], " ");
@@ -127,6 +139,7 @@ export function matchEdition(e: Edition, posts: FoundPost[]): EditionMatch {
   const stageRace = !!e.stages?.length;
   const threads: MatchedThread[] = [];
   const outsideDates: FoundPost[] = [];
+  const otherTitles: EditionMatch["otherTitles"] = [];
   const seen = new Set<string>();
   const taken = new Set<string>(); // "race", "stage-6", "rest-2026-07-13"
 
@@ -135,7 +148,10 @@ export function matchEdition(e: Edition, posts: FoundPost[]): EditionMatch {
     if (seen.has(p.id)) continue;
     seen.add(p.id);
     const t = readTitle(p.title);
-    if (!t || t.year !== e.year || t.category !== (e.category ?? "ME") || !sameRace(t.name, e)) continue;
+    if (!t || t.year !== e.year || t.category !== (e.category ?? "ME") || !sameRace(t.name, e)) {
+      if (/race thread/i.test(p.title)) otherTitles.push({ title: p.title, createdAt: p.createdAt, permalink: p.permalink });
+      continue;
+    }
     const day = p.createdAt.slice(0, 10);
     if (day < from || day > to) {
       outsideDates.push(p);
@@ -158,6 +174,10 @@ export function matchEdition(e: Edition, posts: FoundPost[]): EditionMatch {
       if (taken.has(key)) continue;
       taken.add(key);
       threads.push({ kind: "rest", post: p });
+    } else if (t.kind === "presentation") {
+      if (taken.has("presentation")) continue;
+      taken.add("presentation");
+      threads.push({ kind: "presentation", post: p });
     } else {
       // "race": a one-day race, or the overall thread of a stage race
       if (taken.has("race")) continue;
@@ -170,5 +190,5 @@ export function matchEdition(e: Edition, posts: FoundPost[]): EditionMatch {
   const missingStages = stageRace ? e.stages!.map((s) => s.n).filter((n) => !found.has(n)) : [];
   const missingRace = !stageRace && !taken.has("race");
   threads.sort((a, b) => a.post.createdAt.localeCompare(b.post.createdAt));
-  return { threads, missingStages, missingRace, outsideDates };
+  return { threads, missingStages, missingRace, outsideDates, otherTitles };
 }

@@ -41,6 +41,12 @@ describe("readTitle", () => {
     expect(readTitle("[Race Thread] 2025 Tour de France Femmes – Stage 2 (2.WWT)")?.category).toBe("WE");
   });
 
+  it("reads the team presentation and zero-padded stages (as on r/peloton in 2024)", () => {
+    expect(readTitle("[Race Thread] 2024 Tour de France – Team Presentation")).toMatchObject({ kind: "presentation", name: "Tour de France" });
+    expect(readTitle("[Race Thread] 2025 Tour de France Team Presentation")).toMatchObject({ kind: "presentation", name: "Tour de France" });
+    expect(readTitle("[Race Thread] 2024 Tour de France – Stage 01 (2.UWT)")).toMatchObject({ kind: "stage", stage: 1 });
+  });
+
   it("is not a race thread without the tag", () => {
     expect(readTitle("[Post Race] 2026 Strade Bianche")).toBeUndefined();
   });
@@ -85,6 +91,23 @@ describe("matchEdition", () => {
       post("p", "[Post Race] 2026 Tour de France – Stage 6", "2026-07-09T18:00:00Z"),
     ]);
     expect(m.threads).toEqual([]);
+  });
+
+  it("keeps the team presentation apart from the overall thread", () => {
+    const m = matchEdition(tdf, [
+      post("tp", "[Race Thread] 2026 Tour de France – Team Presentation", "2026-07-02T16:30:00Z"),
+      post("all", "[Race Thread] 2026 Tour de France (2.UWT) – overall", "2026-07-03T08:00:00Z"),
+    ]);
+    expect(m.threads.map((t) => t.kind + ":" + t.post.id)).toEqual(["presentation:tp", "race:all"]);
+  });
+
+  it("lists the race threads it could not use, so a miss can be explained", () => {
+    const m = matchEdition(strade, [
+      post("o", "[Race Thread] 2026 Omloop Het Nieuwsblad (1.UWT)", "2026-02-28T08:00:00Z"),
+      post("z", "[Post Race] 2026 Strade Bianche", "2026-03-07T18:00:00Z"),
+    ]);
+    expect(m.missingRace).toBe(true);
+    expect(m.otherTitles.map((o) => o.title)).toEqual(["[Race Thread] 2026 Omloop Het Nieuwsblad (1.UWT)"]);
   });
 
   it("shows a thread whose date does not fit, without using it", () => {

@@ -50,6 +50,13 @@ function drawRow(i: number, r?: SearchRsp, error?: string): void {
     }
     name.append(d);
   }
+  // when something is missing: the race threads the search found that did not match, to see why
+  if (r && (r.match.missingRace || r.match.missingStages.length) && r.match.otherTitles.length) {
+    const d = document.createElement("details");
+    d.append(el("summary", r.match.otherTitles.length + " other race threads in the search"));
+    for (const o of r.match.otherTitles) d.append(el("div", o.createdAt.slice(0, 10) + " " + o.title));
+    name.append(d);
+  }
   tr.append(name);
   if (error) {
     tr.append(el("td", "error", "miss"), el("td", error, "miss"), el("td"));

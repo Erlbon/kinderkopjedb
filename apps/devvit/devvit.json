@@ -25,5 +25,8 @@
   },
   "scripts": {
     "dev": "npm run watch"
+  },
+  "dev": {
+    "subreddit": "kdb_threads_dev2"
   }
 }
