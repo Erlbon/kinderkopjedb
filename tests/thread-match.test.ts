@@ -85,7 +85,7 @@ describe("matchEdition", () => {
 
   it("leaves out other years, other races, the women's race and other post types", () => {
     const m = matchEdition(tdf, [
-      post("y", "[Race Thread] 2025 Tour de France – Stage 6 (2.UWT)", "2026-07-08T20:00:00Z"),
+      post("y", "[Race Thread] 2025 Tour de France – Stage 6 (2.UWT)", "2025-07-09T20:00:00Z"),
       post("f", "[Race Thread] 2026 Tour de France Femmes – Stage 6 (2.WWT)", "2026-07-08T20:00:00Z"),
       post("g", "[Race Thread] 2026 Giro d'Italia – Stage 6 (2.UWT)", "2026-07-08T20:00:00Z"),
       post("p", "[Post Race] 2026 Tour de France – Stage 6", "2026-07-09T18:00:00Z"),
@@ -111,6 +111,46 @@ describe("matchEdition", () => {
       post("old", "[Race Thread] Paris-Nice - Stage 3 (2.UWT)", "2024-03-05T07:01:00Z"),
     ]);
     expect(m.threads.map((t) => t.post.id)).toEqual(["3", "8"]);
+    expect(m.missingStages).toEqual([]);
+  });
+
+  it("takes a thread with last year's year in the title when it was posted on the race (Giro 2026)", () => {
+    const m = matchEdition(tdf, [post("w", "[Race Thread] 2025 Tour de France – Stage 6 (2.UWT)", "2026-07-09T08:00:00Z")]);
+    expect(m.threads.map((t) => [t.stage, t.note])).toEqual([[6, "the title says 2025"]]);
+  });
+
+  it("reads typos, left-out words and a missing bracket in the race name", () => {
+    const one = (name: string, aliases: string[] = []): Edition => ({ name, aliases, year: 2023, class: "1.UWT", start: "2023-04-19", end: "2023-04-19" });
+    const at = "2023-04-19T08:00:00Z";
+    expect(matchEdition(one("La Flèche Wallonne"), [post("a", "[Race Thread] 2023 Fleche Wallone Men (1.UWT)", at)]).threads).toHaveLength(1);
+    expect(matchEdition(one("Volta Ciclista a Catalunya"), [post("b", "[Race Thread] 2023 Volta Catalunya (1.UWT)", at)]).threads).toHaveLength(1);
+    expect(matchEdition(one("Volta Ciclista a Catalunya"), [post("c", "[Race Thread] 2023 Volte Ciclista a Catalunya (1.UWT)", at)]).threads).toHaveLength(1);
+    expect(matchEdition(one("BEMER Cyclassics", ["Hamburg Cyclassics"]), [post("d", "[Race Thread] BEMER Cyclassic Hamburg (1.UWT)", at)]).threads).toHaveLength(1);
+    expect(matchEdition(one("Tour de Suisse"), [post("e", "[Race Thread 2023 Tour de Suisse (1.UWT)", at)]).threads).toHaveLength(1);
+    // but different races stay apart
+    expect(matchEdition(one("Tour de Suisse"), [post("f", "[Race Thread] 2023 Tour de France (1.UWT)", at)]).threads).toEqual([]);
+    expect(matchEdition(one("Giro dell'Emilia"), [post("g", "[Race Thread] 2023 Giro d'Italia (1.UWT)", at)]).threads).toEqual([]);
+  });
+
+  it("follows the database when it counts the prologue as stage 1 (Tour de Romandie)", () => {
+    const rom: Edition = {
+      name: "Tour de Romandie",
+      year: 2024,
+      class: "2.UWT",
+      start: "2024-04-23",
+      end: "2024-04-25",
+      stages: [
+        { n: 1, date: "2024-04-23" },
+        { n: 2, date: "2024-04-24" },
+        { n: 3, date: "2024-04-25" },
+      ],
+    };
+    const m = matchEdition(rom, [
+      post("p", "[Race Thread] 2024 Tour de Romandie - Prologue (2.UWT)", "2024-04-23T08:00:00Z"),
+      post("1", "[Race Thread] 2024 Tour de Romandie - Stage 1 (2.UWT)", "2024-04-24T08:00:00Z"),
+      post("2", "[Race Thread] 2024 Tour de Romandie - Stage 2 (2.UWT)", "2024-04-25T08:00:00Z"),
+    ]);
+    expect(m.threads.map((t) => t.stage + "=" + t.post.id)).toEqual(["1=p", "2=1", "3=2"]);
     expect(m.missingStages).toEqual([]);
   });
 

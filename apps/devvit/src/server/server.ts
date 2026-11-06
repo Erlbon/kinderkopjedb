@@ -1,9 +1,19 @@
 import { once } from "node:events";
 import type { IncomingMessage, ServerResponse } from "node:http";
-import { reddit } from "@devvit/web/server";
+import { type Post, reddit } from "@devvit/web/server";
 import type { PartialJsonValue, UiResponse } from "@devvit/web/shared";
 import { type FoundPost, editionQueries, matchEdition } from "../../../../src/core/thread-match.ts";
-import { Endpoint, EndpointMethod, type EditionEntry, type EditionsRsp, type ErrorRsp, type SearchReq, type SearchRsp } from "../shared/api.ts";
+import {
+  Endpoint,
+  EndpointMethod,
+  type EditionEntry,
+  type EditionsRsp,
+  type ErrorRsp,
+  type PostsReq,
+  type PostsRsp,
+  type SearchReq,
+  type SearchRsp,
+} from "../shared/api.ts";
 import editionsJson from "../shared/editions.json";
 
 const editions = editionsJson as EditionEntry[];
@@ -11,7 +21,7 @@ const editions = editionsJson as EditionEntry[];
 /** Per query. A Grand Tour has 21+ race threads plus other posts that mention the race. */
 const SEARCH_LIMIT = 250;
 
-type AnyRsp = EditionsRsp | SearchRsp | UiResponse | ErrorRsp;
+type AnyRsp = EditionsRsp | SearchRsp | PostsRsp | UiResponse | ErrorRsp;
 
 export async function onReq(reqMsg: IncomingMessage, rspMsg: ServerResponse): Promise<void> {
   try {
@@ -38,6 +48,9 @@ async function route(reqMsg: IncomingMessage, rspMsg: ServerResponse): Promise<v
       case Endpoint.Search:
         rsp = await routeSearch(await readJson<SearchReq>(reqMsg));
         break;
+      case Endpoint.Posts:
+        rsp = await routePosts(await readJson<PostsReq>(reqMsg));
+        break;
       case Endpoint.OnMenuNewPost:
         rsp = await routeMenuNewPost();
         break;
@@ -61,18 +74,21 @@ async function routeSearch(req: SearchReq): Promise<SearchRsp | ErrorRsp> {
   for (const query of editionQueries(edition)) {
     const found = await reddit.searchPosts({ query, subredditName, sort: "relevance", timeframe: "all", limit: SEARCH_LIMIT, pageSize: 100 }).all();
     queries.push({ query, posts: found.length });
-    for (const p of found) {
-      posts.push({
-        id: p.id,
-        title: p.title,
-        createdAt: p.createdAt.toISOString(),
-        permalink: p.permalink,
-        author: p.authorName,
-        body: p.body,
-      });
-    }
+    for (const p of found) posts.push(toFound(p));
   }
   return { edition, queries, match: matchEdition(edition, posts) };
+}
+
+function toFound(p: Post): FoundPost {
+  return { id: p.id, title: p.title, createdAt: p.createdAt.toISOString(), permalink: p.permalink, author: p.authorName, body: p.body };
+}
+
+/** Posts by id, for the threads the second pass found without their text (at most 50 per call). */
+async function routePosts(req: PostsReq): Promise<PostsRsp | ErrorRsp> {
+  const ids = (req.ids ?? []).filter((id) => /^t3_[a-z0-9]+$/i.test(id)).slice(0, 50);
+  const posts: FoundPost[] = [];
+  for (const id of ids) posts.push(toFound(await reddit.getPostById(id as `t3_${string}`)));
+  return { posts };
 }
 
 async function routeMenuNewPost(): Promise<UiResponse> {

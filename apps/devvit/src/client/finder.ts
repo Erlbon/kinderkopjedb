@@ -1,4 +1,5 @@
-import { Endpoint, type EditionEntry, type EditionsRsp, type SearchReq, type SearchRsp } from "../shared/api.ts";
+import { type FoundPost, matchEdition } from "../../../../src/core/thread-match.ts";
+import { Endpoint, type EditionEntry, type EditionsRsp, type PostsReq, type PostsRsp, type SearchReq, type SearchRsp } from "../shared/api.ts";
 
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
 const rowsEl = $<HTMLTableSectionElement>("rows");
@@ -46,6 +47,7 @@ function drawRow(i: number, r?: SearchRsp, error?: string): void {
       a.target = "_blank";
       const line = el("div");
       line.append(a);
+      if (t.note) line.append(el("span", " (" + t.note + ")", "miss"));
       d.append(line);
     }
     name.append(d);
@@ -95,12 +97,56 @@ async function runAll(): Promise<void> {
       drawRow(i, undefined, err instanceof Error ? err.message : String(err));
     }
   }
+  await secondPass();
   const threads = results.reduce((n, r) => n + r.match.threads.length, 0);
   const want = editions.reduce((n, e) => n + expected(e), 0);
   statusEl.textContent = "Done: " + threads + " threads found, " + want + " expected (stages and one-day races).";
   outEl.value = JSON.stringify({ subreddit, searched: new Date().toISOString(), results }, null, 1);
   runBtn.disabled = false;
   copyBtn.disabled = false;
+}
+
+const misses = (r: SearchRsp) => r.match.missingRace || r.match.missingStages.length > 0;
+
+/**
+ * A thread often turns up in another race's search (the 2026 Dauphiné, renamed, came back in the
+ * Tour de France search). Match every edition with something missing against all race threads that
+ * any search returned, then fetch the text of the threads found that way.
+ */
+async function secondPass(): Promise<void> {
+  const pool = new Map<string, FoundPost>();
+  for (const r of results) {
+    for (const t of r.match.threads) pool.set(t.post.id, t.post);
+    for (const p of r.match.outsideDates) pool.set(p.id, p);
+    for (const o of r.match.otherTitles) if (!pool.has(o.id)) pool.set(o.id, { id: o.id, title: o.title, createdAt: o.createdAt, permalink: o.permalink });
+  }
+  const posts = [...pool.values()];
+  let gained = 0;
+  for (const r of results) {
+    if (!misses(r)) continue;
+    const m = matchEdition(r.edition, posts);
+    const before = r.match.threads.length;
+    if (m.threads.length <= before) continue;
+    statusEl.textContent = "Second pass: " + label(r.edition);
+    // the posts that came from another search as a title only: fetch their text
+    const need = m.threads.filter((t) => t.post.body === undefined).map((t) => t.post.id);
+    for (let i = 0; i < need.length; i += 50) {
+      try {
+        const req: PostsReq = { ids: need.slice(i, i + 50) };
+        const got = await getJson<PostsRsp>(Endpoint.Posts, { method: "POST", body: JSON.stringify(req) });
+        for (const p of got.posts) {
+          const t = m.threads.find((x) => x.post.id === p.id);
+          if (t) t.post = p;
+        }
+      } catch (err) {
+        console.error(err);
+      }
+    }
+    gained += m.threads.length - before;
+    r.match = m;
+    drawRow(editions.indexOf(r.edition), r);
+  }
+  if (gained) statusEl.textContent = "Second pass found " + gained + " more threads.";
 }
 
 async function copy(): Promise<void> {
