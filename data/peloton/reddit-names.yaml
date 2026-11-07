@@ -5,6 +5,11 @@
 # "Paris-Roubaix" finds "Paris-Roubaix Hauts-de-France"; the search itself needs the short name.
 
 rondevanvlaanderen|ME: [Tour of Flanders]
+# women's monuments: the searches use the short names, the women's word in the title picks the women's edition
+rondevanvlaanderen|WE: [Tour of Flanders]
+parisroubaixfemmes|WE: [Paris-Roubaix Femmes, Paris-Roubaix]
+liegebastogneliegefemmes|WE: [Liège-Bastogne-Liège Femmes, Liège-Bastogne-Liège, Liège, LBL]
+milanosanremodonne|WE: [Milano-Sanremo Donne, Milano-Sanremo, Milan-San Remo, Milan-Sanremo]
 vueltaciclistaaespana|ME: [Vuelta a España, La Vuelta]
 parisroubaix|ME: [Paris-Roubaix]
 milanosanremo|ME: [Milano-Sanremo, Milan-San Remo, Milan-Sanremo]

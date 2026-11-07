@@ -9,7 +9,8 @@ import { readFileSync, writeFileSync } from "node:fs";
 import { parse } from "yaml";
 import initSqlJs from "sql.js";
 
-const DB = "data/public/kinderkopjedb-public.sqlite";
+// --db: another database, such as a full copy saved from the Data page (its queue has dates of races without results)
+const DB = process.argv.includes("--db") ? process.argv[process.argv.indexOf("--db") + 1] : "data/public/kinderkopjedb-public.sqlite";
 const NAMES = "data/peloton/reddit-names.yaml";
 const OUT = "apps/devvit/src/shared/editions.json";
 const TEST_RACES = ["stradebianche|ME", "rondevanvlaanderen|ME", "parisnice|ME", "tourfrance|ME"];
@@ -37,13 +38,22 @@ function rows(sql, params = []) {
   return out;
 }
 
+// editions with results, plus the queue's: a race whose results are not captured yet still has its dates there
+const hasQueue = rows("select count(*) n from sqlite_master where name = 'queue_race'")[0].n > 0;
 const editions = [];
 for (const r of rows(
   `select rr.uci_id, rr.year, rr.class, rr.start, rr.end, r.key, r.name, r.category
      from race_result rr join race r using (race_id)
-    where rr.year between ? and ? and rr.start is not null
-    order by rr.start`,
-  [y1, y2 ?? y1],
+    where rr.year between ? and ? and rr.start is not null` +
+    (hasQueue
+      ? ` union
+   select q.uci_id, q.year, q.class, q.start, q.end, r.key, r.name, r.category
+     from queue_race q join race r using (race_id)
+    where q.year between ? and ? and q.start is not null and q.start <> ''
+      and q.uci_id not in (select uci_id from race_result)`
+      : "") +
+    ` order by 4`,
+  hasQueue ? [y1, y2 ?? y1, y1, y2 ?? y1] : [y1, y2 ?? y1],
 )) {
   if (races && !races.includes(r.key)) continue;
   if (klass && !String(r.class ?? "").endsWith(klass)) continue;

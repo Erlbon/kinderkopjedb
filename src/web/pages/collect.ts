@@ -1,5 +1,5 @@
 import { FinderOptions, currentRaces, initLinkFinder, linksBlock } from "./race-links";
-import { CATEGORY_NAMES, JoinSuggestion, QueueLine, buildRaces, chainLines, normRaceName, parseRaceAliases, queueByRace, suggestJoins } from "../../core";
+import { CATEGORY_NAMES, ExternalName, JoinSuggestion, QueueLine, RaceEditions, buildRaces, chainLines, joinByHand, joinLinesOf, normRaceName, parseRaceAliases, queueByRace, suggestJoins, unjoinByHand } from "../../core";
 import { importCaptureFiles } from "../capture-import";
 import { $, el, tick } from "../dom";
 import type { Store } from "../store";
@@ -64,6 +64,31 @@ export function initCollect(store: Store, options: FinderOptions = {}): void {
   }
   /** How many joins wait for a decision; undefined = work it out again (it is the slow part, so only when the data changed). */
   let pendingJoins: number | undefined;
+  /** Races ticked in the list, to be joined by hand (by race key). */
+  const ticked = new Set<string>();
+  const joinLines = (names: ExternalName[]) => joinLinesOf(store.getText("racealiases") ?? "", names.map((n) => n.name));
+  async function joinTicked(races: RaceEditions[]): Promise<void> {
+    const done = joinByHand(races);
+    if ("error" in done) {
+      $("joinmsg").textContent = done.error;
+      return;
+    }
+    await store.setText("racealiases", [store.getText("racealiases") ?? "", ...done.lines].filter((x) => x !== "").join(NL));
+    $<HTMLTextAreaElement>("racealiases").value = store.getText("racealiases") ?? "";
+    ticked.clear();
+    pendingJoins = undefined;
+    draw();
+    $("queuemsg").textContent = races.length + " races joined as one. " + $("queuemsg").textContent;
+  }
+  async function unjoinRace(names: ExternalName[], name: string): Promise<void> {
+    const undone = unjoinByHand(store.getText("racealiases") ?? "", store.getText("racenojoin") ?? "", names.map((n) => n.name));
+    await store.setText("racealiases", undone.aliases);
+    await store.setText("racenojoin", undone.nojoin);
+    $<HTMLTextAreaElement>("racealiases").value = undone.aliases;
+    pendingJoins = undefined;
+    draw();
+    $("queuemsg").textContent = name + " split back into its names (" + undone.removed + " join line" + (undone.removed === 1 ? "" : "s") + " removed; they will not be suggested again). " + $("queuemsg").textContent;
+  }
   /** How high a UCI class ranks: WorldTour first, then ProSeries, then the rest by level. */
   const tier = (cls?: string) => (/UWT|WWT/.test(cls ?? "") ? 0 : /Pro/.test(cls ?? "") ? 1 : /[12]\.1/.test(cls ?? "") ? 2 : /[12]\.2/.test(cls ?? "") ? 3 : 4);
   /** An edition is finished when every point-giving event on its competition page has a result read to the end. Without the event list nothing is known. */
@@ -143,8 +168,21 @@ export function initCollect(store: Store, options: FinderOptions = {}): void {
     }
     if (!rows.length) return;
 
+    // tick races to join them by hand: a bar over the table says how many are ticked and joins them
+    for (const k of [...ticked]) if (!all.races.some((r) => r.key === k)) ticked.delete(k); // gone after a join or a new import
+    if (ticked.size) {
+      const join = el("button", { textContent: "Join as one race", type: "button" });
+      join.onclick = () => joinTicked(all.races.filter((r) => ticked.has(r.key)));
+      const clear = el("button", { textContent: "Clear", type: "button" });
+      clear.onclick = () => {
+        ticked.clear();
+        draw();
+      };
+      out.append(el("div", { class: "row joinbar" }, el("b", { textContent: ticked.size + " ticked" }), join, clear, el("span", { id: "joinmsg", class: "mut" })));
+    }
+
     const table = el("table", { class: "queue" });
-    const head = el("tr", {}, el("th", { textContent: "Race" }), el("th", { textContent: "Done" }));
+    const head = el("tr", {}, el("th", { textContent: "Race", title: "Tick two or more races to join them" }), el("th", { textContent: "Done" }));
     for (const y of years) head.append(el("th", { textContent: String(y) }));
     table.append(head);
     for (const r of rows) {
@@ -161,6 +199,19 @@ export function initCollect(store: Store, options: FinderOptions = {}): void {
       nameCell.append(internal(r) + (r.category === "ME" ? "" : " (" + CATEGORY_NAMES[r.category].toLowerCase() + ")"));
       const rec = records.get(r.key);
       if (rec && (rec.names.length > 1 || rec.names[0]?.name !== rec.name)) nameCell.title = "External names: " + rec.names.map((n) => n.name + " (" + (n.years.length > 1 ? n.years[0] + "-" + n.years[n.years.length - 1] : n.years[0]) + ")").join("; ");
+      if (rec && joinLines(rec.names).length) {
+        const unjoin = el("button", { textContent: "Unjoin", type: "button", title: "Split this race back into the names it was joined from" });
+        unjoin.onclick = () => unjoinRace(rec.names, internal(r));
+        nameCell.append(" ", unjoin);
+      }
+      const box = el("input", { type: "checkbox", title: "Tick two or more races to join them" });
+      box.checked = ticked.has(r.key);
+      box.onchange = () => {
+        if (box.checked) ticked.add(r.key);
+        else ticked.delete(r.key);
+        draw();
+      };
+      nameCell.prepend(box);
       const tr = el("tr", {}, nameCell, el("td", { textContent: eds.filter(finished).length + "/" + eds.length }));
       if (eds.some((e) => e.missingEvents.length || e.waitingEvents.length)) {
         // a twist in front of the name opens the list of what is missing under the row
@@ -305,7 +356,7 @@ export function initCollect(store: Store, options: FinderOptions = {}): void {
           el("td", { class: "seg" }, buttons.same, buttons.diff, buttons.unknown),
           el("td", { textContent: j.fromName }),
           el("td", { textContent: (j.class ? j.class + " " : "") + j.intoName }),
-          el("td", { textContent: years(j.fromYears) + " and " + years(j.intoYears) }),
+          el("td", {}, years(j.fromYears) + " and " + years(j.intoYears), el("div", { class: "mut", textContent: j.why.join(", ") })),
         );
         const row: Row = { j, state: "unknown", tr, buttons };
         buttons.same.onclick = () => decide(row, "same");

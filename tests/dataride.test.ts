@@ -1,7 +1,7 @@
 import { parseHTML } from "linkedom";
 import { describe, expect, it } from "vitest";
 import initSqlJs from "sql.js/dist/sql-wasm-inline.js";
-import { Cube, addCapture, buildRaces, raceKind, chainLines, parseRaceAliases, suggestJoins, categoryFromFilter, cleanHeading, emptyCube, isComplete, isOtherCategory, isScoringEvent, mergeEvents, pageKind, queueByRace, queueStatus, readCompetitionEvents, readCompetitionList, readEventResults } from "../src/core";
+import { Cube, addCapture, buildRaces, raceKind, chainLines, joinByHand, joinLinesOf, unjoinByHand, parseRaceAliases, suggestJoins, categoryFromFilter, cleanHeading, emptyCube, isComplete, isOtherCategory, isScoringEvent, mergeEvents, pageKind, queueByRace, queueStatus, readCompetitionEvents, readCompetitionList, readEventResults } from "../src/core";
 import { loadCube, openDatabase, saveCube, setKv, writeRaces } from "../src/db";
 
 const doc = (html: string) => parseHTML(html).document as unknown as Document;
@@ -164,6 +164,62 @@ describe("the same race under different names", () => {
     // once accepted it is not suggested again, and a rejected pair stays rejected
     expect(suggestJoins(cube, line)).toHaveLength(0);
     expect(suggestJoins(cube, "", line)).toHaveLength(0);
+  });
+  it("also suggests names that share their telltale words, when neither holds the other (pass 2)", () => {
+    const cube = queue(
+      comp(1, "Gent-Wevelgem in Flanders Fields", 2021), comp(2, "In Flanders Fields - From Middelkerke to Wevelgem", 2023),
+      comp(3, "Trofeo Alfredo Binda - Comune di Cittiglio", 2022, "WE"), comp(4, "Trofeo Alfredo Binda Cittiglio", 2025, "WE"),
+    );
+    const found = suggestJoins(cube);
+    expect(found.map((j) => j.fromName + " -> " + j.intoName).sort()).toEqual([
+      "Gent-Wevelgem in Flanders Fields -> In Flanders Fields - From Middelkerke to Wevelgem", // into the newest
+      "Trofeo Alfredo Binda - Comune di Cittiglio -> Trofeo Alfredo Binda Cittiglio",
+    ]);
+    // each pair says what the two have in common
+    const binda = found.find((j) => j.category === "WE")!;
+    expect(binda.why).toEqual(["one name has all the other's words", "same week of the season", "same class", "same country"]);
+    // accepting it joins them like any other line, and a rejection in either direction keeps it away
+    const line = binda.from + " = " + binda.into;
+    expect(queueByRace(cube, line).races).toHaveLength(3);
+    expect(suggestJoins(cube, "", line).filter((j) => j.category === "WE")).toHaveLength(0);
+    expect(suggestJoins(cube, "", binda.into + " = " + binda.from).filter((j) => j.category === "WE")).toHaveLength(0);
+  });
+  it("one shared word is enough only for two races of the same class in the same week", () => {
+    const dated = (id: number, name: string, year: number, start: string, cls = "2.WWT") => ({ ...comp(id, name, year, "WE"), start: year + start, end: year + start, class: cls });
+    expect(suggestJoins(queue(dated(1, "Baloise Belgium Tour", 2022, "-06-14"), dated(2, "Lotto Belgium Tour", 2024, "-06-16")))).toHaveLength(1);
+    expect(suggestJoins(queue(dated(1, "Baloise Belgium Tour", 2022, "-06-14"), dated(2, "Lotto Belgium Tour", 2024, "-09-16")))).toHaveLength(0); // months apart
+    expect(suggestJoins(queue(dated(1, "Baloise Belgium Tour", 2022, "-06-14"), dated(2, "Lotto Belgium Tour", 2024, "-06-16", "2.1")))).toHaveLength(0); // another class
+    // words many races share (Tour, Grand Prix, Classic ...) never count
+    expect(suggestJoins(queue(dated(1, "Grand Prix Alpha Classic", 2022, "-06-14"), dated(2, "Grand Prix Beta Classic", 2024, "-06-14")))).toHaveLength(0);
+    // nor do championship words in other languages, the race kind, years and edition numbers
+    expect(suggestJoins(queue(dated(1, "Championnats Nationaux Route - Belgique", 2021, "-06-14", "CN"), dated(2, "Championnats Nationaux Route - Suisse", 2022, "-06-14", "CN")))).toHaveLength(0);
+    expect(suggestJoins(queue(dated(1, "Juegos Panamericanos Santiago 2023 - ITT", 2023, "-06-14"), dated(2, "XX Juegos Centroamericanos 2025 ITT", 2025, "-06-14")))).toHaveLength(0);
+  });
+  it("races ticked by hand are joined into the one with the newest edition, and can be unjoined", () => {
+    const cube = queue(comp(1, "Tour des Flandres Femmes", 2021, "WE"), comp(2, "Ronde van Vlaanderen voor Vrouwen", 2022, "WE"), comp(3, "Ronde van Vlaanderen", 2025, "WE"), comp(4, "Ronde van Vlaanderen", 2025));
+    const women = queueByRace(cube).races.filter((r) => r.category === "WE");
+    const done = joinByHand(women);
+    expect(done).toEqual({ lines: ["Ronde van Vlaanderen voor Vrouwen = Tour des Flandres Femmes = Ronde van Vlaanderen"] });
+    const aliases = "Other A = Other B" + String.fromCharCode(10) + (done as { lines: string[] }).lines[0];
+    const joined = queueByRace(cube, aliases).races;
+    expect(joined.filter((r) => r.category === "WE").map((r) => Object.keys(r.editions).length)).toEqual([3]);
+    expect(joined.filter((r) => r.category === "ME")).toHaveLength(1); // the men's race is untouched
+    // unjoin: the race's line goes (others stay), and its pairs are not suggested again
+    const names = ["Tour des Flandres Femmes", "Ronde van Vlaanderen voor Vrouwen", "Ronde van Vlaanderen"];
+    expect(joinLinesOf(aliases, names)).toHaveLength(1);
+    const undone = unjoinByHand(aliases, "", names);
+    expect(undone).toMatchObject({ aliases: "Other A = Other B", removed: 1 });
+    expect(queueByRace(cube, undone.aliases).races.filter((r) => r.category === "WE")).toHaveLength(3);
+    expect(suggestJoins(cube, undone.aliases, undone.nojoin).filter((j) => j.category === "WE")).toHaveLength(0);
+  });
+  it("refuses to join by hand what cannot be one race, and says why", () => {
+    const cube = queue(comp(1, "Alpha Race", 2024), comp(2, "Beta Race", 2024), comp(3, "Gamma Race", 2023, "WE"), comp(4, "Alpha Race (ITT)", 2022));
+    const races = queueByRace(cube).races;
+    const by = (n: string) => races.find((r) => r.name === n)!;
+    expect(joinByHand([by("Alpha Race"), by("Beta Race")])).toEqual({ error: "Not joined: Alpha Race and Beta Race both have a 2024 edition, so they are two races." });
+    expect(joinByHand([by("Alpha Race"), by("Gamma Race")])).toMatchObject({ error: expect.stringContaining("men's and women's") });
+    expect(joinByHand([by("Alpha Race"), by("Alpha Race (ITT)")])).toMatchObject({ error: expect.stringContaining("time trial") });
+    expect(joinByHand([by("Alpha Race")])).toMatchObject({ error: expect.stringContaining("two or more") });
   });
   it("keeps two races apart when both have an edition in the same year", () => {
     const cube = queue(comp(1, "Tour de Something Long", 2026), comp(2, "Tour de Something Long - Grand Prix", 2026));

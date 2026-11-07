@@ -692,12 +692,71 @@ export interface JoinSuggestion {
   intoYears: number[];
   category: Category;
   class?: string;
+  why: string[]; // what the two have in common, shown with the pair
+}
+
+/** Words that say nothing about which race it is: categories, languages' little words, and sponsors' joining words. */
+const STOP_WORDS = new Set(
+  ("men mens women womens woman ladies dames femmes feminin feminine femenina femminile donne vrouwen voor elite we me " +
+    "the of de la le les il del della dell di du des van der den het and et y a avec by powered presented in to from op en d l da do " +
+    "itt irr ttt") // the kind of race is checked on its own
+    .split(" "),
+);
+/** Words many different races share: one of them alone does not make two names the same race. */
+const COMMON_WORDS = new Set(
+  ("tour grand prix gp classic classica classique trofeo trophy trophee coppa cup race course ronde circuit criterium memorial " +
+    "omloop giro vuelta volta championships championship national road internazionale international internationale ciclistica " +
+    "cycling cyclisme uci worldtour open festival championnats nationaux route campeonato campeonatos nacional nacionales ruta " +
+    "juegos games ciclismo para")
+    .split(" "),
+);
+
+/** The words of a race name that tell it apart: accents, case, little words and common words dropped. */
+export function telltaleWords(name: string): Set<string> {
+  const plain = cleanRaceName(name)
+    .normalize("NFD")
+    .replace(new RegExp("[" + String.fromCharCode(0x300) + "-" + String.fromCharCode(0x36f) + "]", "g"), "")
+    .toLowerCase();
+  // years and edition numbers (2023, XIX) change from edition to edition
+  return new Set(plain.split(/[^a-z0-9]+/).filter((w) => w.length >= 3 && !/^[0-9]+$/.test(w) && !/^[ivxlc]+$/.test(w) && !STOP_WORDS.has(w) && !COMMON_WORDS.has(w)));
+}
+
+/** The day of the season a race is usually held on (the middle of its editions' start days), when the dates are known. */
+function usualDay(r: RaceEditions): number | undefined {
+  const days = Object.values(r.editions)
+    .map((e) => /^\d{4}-(\d\d)-(\d\d)/.exec(e.start))
+    .filter((m): m is RegExpExecArray => !!m)
+    .map((m) => (+m[1]! - 1) * 30.5 + +m[2]!)
+    .sort((a, b) => a - b);
+  return days.length ? days[Math.floor(days.length / 2)] : undefined;
+}
+
+function newestEdition(r: RaceEditions): QueueLine {
+  return Object.values(r.editions).reduce((a, b) => (b.year > a.year ? b : a));
+}
+
+/** What two races have in common besides their names, as shown with a suggested join. */
+function alike(a: RaceEditions, b: RaceEditions): { sameWeek: boolean; sameClass: boolean; why: string[] } {
+  const da = usualDay(a);
+  const db = usualDay(b);
+  const sameWeek = da !== undefined && db !== undefined && Math.abs(da - db) <= 7;
+  const ca = newestEdition(a).class;
+  const sameClass = !!ca && ca === newestEdition(b).class;
+  const country = newestEdition(a).country;
+  const why: string[] = [];
+  if (sameWeek) why.push("same week of the season");
+  if (sameClass) why.push("same class");
+  if (country && country === newestEdition(b).country) why.push("same country");
+  return { sameWeek, sameClass, why };
 }
 
 /**
- * Pairs that look like the same race under two names: one cleaned name starts the other (a sponsor added or dropped),
- * the shorter is long enough to mean something, and the years never overlap. Joins already made by `aliases` and
- * pairs the user rejected (`nojoin`, in the alias line format) are left out. Nothing is joined here: the user decides.
+ * Pairs that look like the same race under two names, in two passes, each pair with the years never overlapping:
+ * 1. one cleaned name holds the other (a sponsor added or dropped), the shorter long enough to mean something;
+ * 2. the names share their telltale words (see telltaleWords): one's words all in the other's, or two words in common,
+ *    or one word in common for two races of the same class held in the same week.
+ * Joins already made by `aliases` and pairs the user rejected (`nojoin`, in the alias line format) are left out.
+ * Nothing is joined here: the user decides.
  */
 export function suggestJoins(cube: Cube, aliases = "", nojoin = ""): JoinSuggestion[] {
   const map = groupQueue(cube);
@@ -719,7 +778,7 @@ export function suggestJoins(cube: Cube, aliases = "", nojoin = ""): JoinSuggest
     for (let j = i + 1; j < parts.length; j++) {
       const B = parts[j]!;
       if (gone.has(B.key) || B.cat !== A.cat || B.base.length <= A.base.length || !B.base.includes(A.base)) continue;
-      if (rejected.has(B.base + ">" + A.base)) continue; // rejected lines read "sponsored name = core name"
+      if (rejected.has(B.base + ">" + A.base) || rejected.has(A.base + ">" + B.base)) continue; // rejected lines read "sponsored name = core name" (or the other way, from an unjoin)
       if (raceKind(map.get(A.key)!.keyName) !== raceKind(map.get(B.key)!.keyName)) continue; // a time trial is not the road race of the same name
       const a = map.get(A.key)!;
       const b = map.get(B.key)!;
@@ -728,13 +787,101 @@ export function suggestJoins(cube: Cube, aliases = "", nojoin = ""): JoinSuggest
       const cls = a.editions[Math.max(...intoYears)]?.class; // the core race's newest class
       const fromName = b.name; // as shown before the join: after it the joined race carries one name
       const intoName = a.name;
+      const { why } = alike(a, b);
       if (mergeEditions(b, a)) {
         gone.add(B.key);
-        out.push({ from: b.keyName, into: a.keyName, fromName, intoName, fromYears, intoYears, category: a.category, ...(cls ? { class: cls } : {}) });
+        out.push({ from: b.keyName, into: a.keyName, fromName, intoName, fromYears, intoYears, category: a.category, ...(cls ? { class: cls } : {}), why: ["one name holds the other", ...why] });
       }
     }
   }
+
+  // pass 2: shared telltale words. Only pairs that share a word are looked at, through an index of words.
+  const left = [...map.values()].filter((r) => !gone.has(r.key));
+  const words = new Map(left.map((r) => [r.key, telltaleWords(r.keyName)]));
+  const byWord = new Map<string, RaceEditions[]>();
+  for (const r of left) for (const w of words.get(r.key)!) byWord.set(w + "|" + r.category, [...(byWord.get(w + "|" + r.category) ?? []), r]);
+  const seen = new Set<string>();
+  const pairs: { a: RaceEditions; b: RaceEditions; strength: number; why: string[] }[] = [];
+  for (const group of byWord.values()) {
+    for (let i = 0; i < group.length; i++) {
+      for (let j = i + 1; j < group.length; j++) {
+        const [a, b] = [group[i]!, group[j]!];
+        const id = a.key < b.key ? a.key + ">" + b.key : b.key + ">" + a.key;
+        if (seen.has(id)) continue;
+        seen.add(id);
+        if (Object.keys(a.editions).some((y) => y in b.editions)) continue;
+        if (raceKind(a.keyName) !== raceKind(b.keyName)) continue;
+        const wa = words.get(a.key)!;
+        const wb = words.get(b.key)!;
+        const shared = [...wa].filter((w) => wb.has(w)).length;
+        const holds = shared === Math.min(wa.size, wb.size);
+        const { sameWeek, sameClass, why } = alike(a, b);
+        const strength = holds ? 3 : shared >= 2 ? 2 : sameWeek && sameClass ? 1 : 0;
+        if (!strength) continue;
+        pairs.push({ a, b, strength: strength + (sameWeek ? 1 : 0), why: [holds ? "one name has all the other's words" : "names share words", ...why] });
+      }
+    }
+  }
+  pairs.sort((x, y) => y.strength - x.strength);
+  for (const { a, b, why } of pairs) {
+    if (gone.has(a.key) || gone.has(b.key)) continue;
+    // the race with the newest edition is the one the other continues as
+    const newer = (r: RaceEditions) => Math.max(...Object.keys(r.editions).map(Number));
+    const [from, into] = newer(a) >= newer(b) ? [b, a] : [a, b];
+    const [nf, ni] = [normRaceName(from.keyName), normRaceName(into.keyName)];
+    if (rejected.has(nf + ">" + ni) || rejected.has(ni + ">" + nf)) continue;
+    const fromYears = Object.keys(from.editions).map(Number).sort((x, y) => x - y);
+    const intoYears = Object.keys(into.editions).map(Number).sort((x, y) => x - y);
+    const cls = into.editions[Math.max(...intoYears)]?.class;
+    const fromName = from.name;
+    const intoName = into.name;
+    if (mergeEditions(from, into)) {
+      gone.add(from.key);
+      out.push({ from: from.keyName, into: into.keyName, fromName, intoName, fromYears, intoYears, category: into.category, ...(cls ? { class: cls } : {}), why });
+    }
+  }
   return out;
+}
+
+/**
+ * Races the user ticked to be one race, as alias lines: each joins the race with the newest edition. Refused, with the
+ * reason, when they are of different categories or kinds (a time trial and a road race), or two have the same year.
+ */
+export function joinByHand(races: RaceEditions[]): { lines: string[] } | { error: string } {
+  if (races.length < 2) return { error: "Tick two or more races to join." };
+  if (new Set(races.map((r) => r.category)).size > 1) return { error: "Not joined: men's and women's races stay apart." };
+  if (new Set(races.map((r) => raceKind(r.keyName))).size > 1) return { error: "Not joined: a time trial and a road race are different races." };
+  const seen = new Map<string, string>();
+  for (const r of races) {
+    for (const y of Object.keys(r.editions)) {
+      if (seen.has(y)) return { error: "Not joined: " + seen.get(y) + " and " + r.name + " both have a " + y + " edition, so they are two races." };
+      seen.set(y, r.name);
+    }
+  }
+  const newest = (r: RaceEditions) => Math.max(...Object.keys(r.editions).map(Number));
+  const into = races.reduce((a, b) => (newest(b) > newest(a) ? b : a));
+  return { lines: chainLines(races.filter((r) => r !== into).map((r): [string, string] => [r.keyName, into.keyName])) };
+}
+
+/** The saved alias lines that name any of a race's names: the lines that joined it. */
+export function joinLinesOf(aliases: string, names: string[]): string[] {
+  const mine = new Set(names.map(normRaceName));
+  return aliases.split(String.fromCharCode(10)).filter((line) => parseRaceAliases(line).some(([a, b]) => mine.has(normRaceName(a)) || mine.has(normRaceName(b))));
+}
+
+/**
+ * Undo a race's joins: its alias lines go, and the pairs they joined are written to the rejected lines (`nojoin`) so the
+ * review does not offer them again. Alias lines hold for men's and women's races alike.
+ */
+export function unjoinByHand(aliases: string, nojoin: string, names: string[]): { aliases: string; nojoin: string; removed: number } {
+  const NL = String.fromCharCode(10);
+  const lines = joinLinesOf(aliases, names);
+  const rejected = lines.flatMap((l) => parseRaceAliases(l).map(([a, b]) => a + " = " + b));
+  return {
+    aliases: aliases.split(NL).filter((l) => !lines.includes(l)).join(NL),
+    nojoin: [nojoin, ...rejected].filter((x) => x.trim() !== "").join(NL),
+    removed: lines.length,
+  };
 }
 
 export interface SeasonColumn {

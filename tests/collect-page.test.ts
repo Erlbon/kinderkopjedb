@@ -67,7 +67,7 @@ describe("races whose names changed", () => {
     expect(choice(doc, "Don't know").classList.contains("on")).toBe(true); // nothing is decided yet
     expect(choice(doc, "Same race").classList.contains("on")).toBe(false);
     const cells = Array.from(doc.querySelectorAll("#joinreview tr:nth-child(2) td")).map((c) => c.textContent);
-    expect(cells.slice(1)).toEqual(["Boucles de la Mayenne - Crédit Mutuel", "1.1 Boucles de la Mayenne", "2025 and 2026"]);
+    expect(cells.slice(1)).toEqual(["Boucles de la Mayenne - Crédit Mutuel", "1.1 Boucles de la Mayenne", "2025 and 2026one name holds the other, same week of the season, same class, same country"]);
     choice(doc, "Same race").click();
     expect(choice(doc, "Same race").classList.contains("on")).toBe(true);
     expect(choice(doc, "Don't know").classList.contains("on")).toBe(false);
@@ -82,6 +82,36 @@ describe("races whose names changed", () => {
     expect(doc.getElementById("joinreview")!.textContent).toBe("");
     expect(doc.getElementById("mergednote")!.textContent).toContain("No more joins to review");
     expect(doc.getElementById("aliasmsg")!.textContent).toContain("1 pairs joined");
+  });
+  it("races ticked in the list are joined with one button, and Unjoin splits them again", async () => {
+    const { doc, texts, rows, button } = pageWith([["Mayenne Tour", 2026], ["Tour de la Mayenne Old", 2024], ["Other Race", 2025]]);
+    const tick = (name: string) => {
+      const box = Array.from(doc.querySelectorAll("#queueout td input[type=checkbox]")).find((b) => b.parentElement!.textContent!.includes(name)) as HTMLInputElement;
+      box.checked = true;
+      box.onchange!(new Event("change"));
+    };
+    expect(rows()).toHaveLength(2);
+    tick("Mayenne Tour");
+    expect(doc.querySelector(".joinbar")!.textContent).toContain("1 ticked");
+    tick("Tour de la Mayenne Old");
+    await (button("Join as one race").onclick as () => Promise<void>)();
+    expect(texts.get("racealiases")).toBe("Tour de la Mayenne Old = Mayenne Tour"); // into the race with the newest edition
+    expect(rows()).toHaveLength(1);
+    expect(doc.querySelector(".joinbar")).toBeNull();
+    await (button("Unjoin").onclick as () => Promise<void>)();
+    expect(texts.get("racealiases")).toBe("");
+    expect(texts.get("racenojoin")).toBe("Tour de la Mayenne Old = Mayenne Tour");
+    expect(rows()).toHaveLength(2);
+  });
+  it("a tick-join that cannot be one race says why and joins nothing", async () => {
+    const { doc, texts, button } = pageWith([["Mayenne Tour", 2026], ["Other Race", 2026]]);
+    for (const box of Array.from(doc.querySelectorAll("#queueout td input[type=checkbox]")) as HTMLInputElement[]) {
+      box.checked = true;
+      box.onchange!(new Event("change"));
+    }
+    await (button("Join as one race").onclick as () => Promise<void>)();
+    expect(doc.getElementById("joinmsg")!.textContent).toContain("both have a 2026 edition");
+    expect(texts.get("racealiases")).toBeUndefined();
   });
   it("Not the same is struck through at once, remembered, and not suggested again", async () => {
     const { doc, texts, rows, button } = pageWith(MAYENNE);
@@ -432,7 +462,8 @@ describe("the race queue page", () => {
     doc.getElementById("queuemissing")!.onchange!(new Event("change"));
     const cells = Array.from(doc.querySelectorAll("#queueout table tr td:first-child"));
     const finished = cells.find((c) => c.textContent?.includes("Finished Classic"))!;
-    expect(finished.firstElementChild?.textContent).toBe("1.UWT");
+    expect(finished.firstElementChild?.getAttribute("type")).toBe("checkbox"); // the tick box for joining by hand, then the pill
+    expect(finished.querySelector(".tag")?.textContent).toBe("1.UWT");
     expect(finished.textContent).toBe("1.UWTFinished Classic");
     const waiting = cells.find((c) => c.textContent?.includes("Waiting Classic"))!;
     expect(waiting.querySelector(".tag")?.textContent).toBe("1.Pro"); // an unfinished race also has a twist in front of the pill
