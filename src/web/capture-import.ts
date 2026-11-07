@@ -1,11 +1,29 @@
-import { CaptureFile, addCapture } from "../core";
+import { CaptureFile, addCapture, readUciCalendar, readXlsxRows } from "../core";
 import type { Store } from "./store";
 
-/** Open capture files (made by the bookmarks) into the database. Returns one line per file. */
+/** A UCI calendar export (.xlsx) into the queue: its elite races, with their dates, until DataRide's take their place. */
+async function importCalendar(store: Store, f: File): Promise<string> {
+  const cal = readUciCalendar(await readXlsxRows(new Uint8Array(await f.arrayBuffer())));
+  const before = store.cube.queue?.length ?? 0;
+  const r = addCapture(store.cube, { format: "racethreads-capture/1", competitions: cal.competitions });
+  const kept = (store.cube.queue?.length ?? 0) - before;
+  return (
+    f.name + ": UCI calendar " + (cal.season ?? "") + ", " + cal.competitions.length + " elite races (" + Object.entries(r.categories ?? {}).map(([n, c]) => c + " " + n.toLowerCase()).join(", ") + "), " +
+    kept + " new in the queue" + (cal.competitions.length - kept > 0 ? " (the rest were there already)" : "") + "; " + cal.skipped + " junior, under-23 and criterium races left out" +
+    (cal.guessed ? "; " + cal.guessed + " had no category in the file, men's or women's read from the name" : "") +
+    (cal.unknownCountries.length ? "; countries not known: " + cal.unknownCountries.join(", ") : "")
+  );
+}
+
+/** Open capture files (made by the bookmarks) into the database, and UCI calendar exports (.xlsx). Returns one line per file. */
 export async function importCaptureFiles(store: Store, files: File[]): Promise<string[]> {
   const lines: string[] = [];
   for (const f of files) {
     try {
+      if (/\.xlsx$/i.test(f.name)) {
+        lines.push(await importCalendar(store, f));
+        continue;
+      }
       let parsed: CaptureFile;
       try {
         parsed = JSON.parse(await f.text()) as CaptureFile;

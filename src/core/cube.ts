@@ -152,8 +152,9 @@ export function addCapture(cube: Cube, file: CaptureFile): ImportReport {
     report.races++;
   }
   const index = new Map((cube.queue ?? []).map((q) => [q.uciId, q] as [number, QueueRace])); // by id, so a big file is not searched line by line
+  const calendar = (cube.queue ?? []).filter((q) => q.uciId < 0); // lines from the UCI calendar, waiting for DataRide's
   for (const c of file.competitions ?? []) {
-    upsertCompetition(cube, c, index);
+    upsertCompetition(cube, c, index, calendar);
     report.competitions = (report.competitions ?? 0) + 1;
     const name = CATEGORY_NAMES[c.category ?? "ME"];
     (report.categories ??= {})[name] = (report.categories[name] ?? 0) + 1;
@@ -219,9 +220,42 @@ function queueRace(cube: Cube, id: number, index?: Map<number, QueueRace>): Queu
 }
 
 /** One line of the DataRide competition list into the queue (what a later capture knows better replaces what is there). */
-function upsertCompetition(cube: Cube, c: DrCompetition, index: Map<number, QueueRace>): void {
+/**
+ * A line from the UCI calendar (a stand-in id below zero, see uci-calendar.ts) and a DataRide competition are the same
+ * race: same season and category, the DataRide start within the calendar's dates (a day either side), and names alike.
+ */
+function sameCalendarRace(cal: QueueRace, c: DrCompetition): boolean {
+  if (cal.year !== c.year || (cal.category ?? "ME") !== (c.category ?? "ME") || !cal.start || !c.start) return false;
+  const day = (iso: string) => Date.parse(iso) / 86400000;
+  if (day(c.start) < day(cal.start) - 1 || day(c.start) > day(cal.end || cal.start) + 1) return false;
+  const [a, b] = [normRaceName(cal.name), normRaceName(c.name)];
+  if (a === b || (a.length >= MIN_PREFIX && b.includes(a)) || (b.length >= MIN_PREFIX && a.includes(b))) return true;
+  const words = telltaleWords(c.name);
+  return [...telltaleWords(cal.name)].some((w) => words.has(w));
+}
+
+/**
+ * Add or update a competition in the queue. A competition from DataRide takes the place of the calendar lines for the
+ * same race (they have no DataRide id); a calendar line is not added when its DataRide competition is already there.
+ */
+function upsertCompetition(cube: Cube, c: DrCompetition, index: Map<number, QueueRace>, calendar: QueueRace[]): void {
+  const queue = (cube.queue ??= []);
+  if (c.id < 0 && !index.has(c.id)) {
+    const asLine: QueueRace = { uciId: c.id, year: c.year, name: c.name, start: c.start, end: c.end, country: c.country, hub: "UCI calendar", ...(c.category ? { category: c.category } : {}) };
+    const captured = queue.some((q) => q.uciId > 0 && q.year === c.year && sameCalendarRace(asLine, { id: q.uciId, name: q.name, start: q.start, end: q.end, year: q.year, country: q.country, class: q.class ?? "", inProgress: false, ...(q.category ? { category: q.category } : {}) }));
+    if (captured) return;
+  }
+  if (c.id > 0 && calendar.length) {
+    const gone = calendar.filter((cal) => sameCalendarRace(cal, c));
+    for (const cal of gone) {
+      queue.splice(queue.indexOf(cal), 1);
+      calendar.splice(calendar.indexOf(cal), 1);
+      index.delete(cal.uciId);
+    }
+  }
   const r = queueRace(cube, c.id, index);
-  Object.assign(r, { year: c.year, name: c.name, start: c.start, end: c.end, country: c.country, class: c.class || undefined, category: c.category, hub: "DataRide" });
+  Object.assign(r, { year: c.year, name: c.name, start: c.start, end: c.end, country: c.country, class: c.class || undefined, category: c.category, hub: c.id < 0 ? "UCI calendar" : "DataRide" });
+  if (c.id < 0) calendar.push(r);
 }
 
 /**

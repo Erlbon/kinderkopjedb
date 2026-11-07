@@ -20,3 +20,5 @@ export * from "./autopilot";
 export * from "./stats";
 export * from "./links";
 export * from "./countries";
+export * from "./xlsx";
+export * from "./uci-calendar";

@@ -229,6 +229,9 @@ export function initCollect(store: Store, options: FinderOptions = {}): void {
         const td = el("td");
         if (!e) {
           td.textContent = "-";
+        } else if (e.uciId < 0) {
+          // from the UCI calendar: no DataRide page to open until that season's list is captured
+          td.append(el("span", { class: "mut", textContent: "calendar", title: (e.class ? e.class + ", " : "") + e.name + ", " + e.start + (e.start === e.end ? "" : " to " + e.end) + ". From the UCI calendar: capture this season's DataRide list to collect it." }));
         } else {
           const a = el("a", {
             href: "https://dataride.uci.ch/iframe/CompetitionResults/" + e.uciId + "?disciplineId=10",
